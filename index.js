@@ -246,8 +246,33 @@ app.get('/:username', function(req, res) {
             [req.user.href])
       .then(function(result) {
         console.log('Insert res', result);
-        data.content.projects = result.rows;
+        data.content.projects = result.rows.map(function(project) {
+          project.url = '/' + req.user.username + '/' + project.name;
+          return project;
+        });
         renderPage('User', data, req, res);
+      }).catch(function(err) {
+        console.log(err);
+        console.log(err.stack)
+        closeClient();
+        throw err;
+      });;
+  });
+});
+
+app.get('/:username/:project', function(req, res) {
+
+  var data = {};
+  data.content = {};
+
+  pg.connect(DATABASE_URL, function(err, client, closeClient) {
+    if (err) console.log('Connection error', err);
+    clientQuery(client, 'select * from projects where userid=$1 and name=$2',
+            [req.user.href, req.params.project])
+      .then(function(result) {
+        console.log('Insert res', result);
+        data.content.name = result.rows[0].name;
+        renderPage('Project', data, req, res);
       }).catch(function(err) {
         console.log(err);
         console.log(err.stack)
