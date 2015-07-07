@@ -34,7 +34,7 @@ class Home extends React.Component {
 <section className={`${P}`}>
   <div className={`${P}-hero container`}>
     <div className="logo">deep<span className="logo-stack">stack</span></div>
-    <div className={`${P}-subtitle`}>The Neural Network Package Manager</div>
+    <div className={`${P}-subtitle`}>The Neural Networks Repository</div>
   </div>
 
   <div className={`${P}-tutorial`}>

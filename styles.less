@@ -30,6 +30,7 @@ input[type="submit"], button, .button {
 input[type="submit"]:hover, button:hover, .button:hover {
   background: transparent;
   border-color: #fff;
+  color: #fff;
 }
 
 .rating {
@@ -53,7 +54,6 @@ h3 {
 
 *:focus, input[type="text"]:focus {
   outline: 0;
-  border: 0px;
 }
 
 label {
@@ -62,14 +62,17 @@ label {
   margin-top: 22px;
   display: block;
 }
-input[type="text"] {
+input[type="text"], input[type="text"]:focus {
   border: 0px;
+  border-bottom: 1px solid #C0C0C0;
+  border-radius: 0px;
   padding: 0px;
   background: transparent;
   color: #fff;
   outline: none;
   margin-bottom: 0px;
   font-size: 17px;
+  height: 28px;
 }
 
 .logo {

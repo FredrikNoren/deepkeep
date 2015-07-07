@@ -7,13 +7,14 @@ var P = 'app'; // style class name prefix
 class App extends React.Component {
   render() {
     var profileSection = null;
-    if (this.props.profileImage) {
+    if (this.props.userDisplayName) {
       profileSection = <div style={{ display: 'flex' }}>
         <a href="/projects/new" className="button">+ New project</a>
-        <img src={this.props.profileImage} className="profile-image" style={{ margin: 10 }} />
+        {this.props.userDisplayName}
+        <a href="/logout" className="button">Logout</a>
       </div>
     } else {
-      profileSection = <a href="/auth/facebook" className="button">Login with Facebook</a>
+      profileSection = <a href="/login" className="button">Login</a>
     }
     return (<div>
         <a style={{ position: 'fixed', right: 20, bottom: 20 }} href="/reset">Reset</a>
@@ -51,7 +52,6 @@ App.styles = `
     display: flex;
   }
   .${P}-search-input {
-    border-bottom: 1px solid #eee;
     margin-bottom: 8px;
     display: flex;
     align-items: center;

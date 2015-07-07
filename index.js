@@ -1,13 +1,12 @@
 var fs = require('fs');
 var path = require('path');
 var express = require('express');
-var session = require('express-session');
-var flash = require('connect-flash');
-var cookieParser = require('cookie-parser');
 var bodyParser = require('body-parser');
 var async = require('async');
 var moment = require('moment');
 var merge = require('merge');
+var stormpath = require('express-stormpath');
+var multer  = require('multer')
 var less = require('less');
 var browserify = require('browserify');
 var streamToBuffer = require('stream-to-buffer');
@@ -17,6 +16,8 @@ var React = require('react');
 require('node-jsx').install({extension: '.jsx', harmony: true });
 
 var app = express();
+
+app.use(bodyParser.urlencoded({ extended: false }));
 
 var DATABASE_URL = process.env.DATABASE_URL || 'postgres://localhost:5432/deepstack';
 
@@ -37,71 +38,13 @@ function runSQLFile(filename, callback) {
   });
 }
 
+app.use(stormpath.init(app, {
+    apiKeyFile: 'apiKey-2RZ5G43WQYYMW6GFWTM865I17.properties',
+    application: 'https://api.stormpath.com/v1/applications/6xIObjnyqyxBynY5R7shov',
+    secretKey: 'some_long_random_string',
+    debug: true
+}));
 
-
-var passport = require('passport');
-var FacebookStrategy = require('passport-facebook').Strategy;
-
-passport.serializeUser(function(user, done) {
-  done(null, user.id);
-});
-
-passport.deserializeUser(function(userId, done) {
-  pg.connect(DATABASE_URL, function(err, client, closeClient) {
-    if (err) console.log('Connection error', err);
-    client.query('select * from users where id=$1', [userId], function(err, result) {
-      if (result.rows.length > 0) {
-        closeClient();
-        done(null, result.rows[0]);
-        return;
-      } else {
-        done(null, false);
-      }
-    });
-  });
-});
-
-passport.use(new FacebookStrategy({
-    clientID: '826007657490242',
-    clientSecret: '7b4087305907faef40cca09eb845de5c',
-    callbackURL: 'http://localhost:8080/auth/facebook/callback',
-    profileFields: ['id', 'displayName', 'photos']
-  },
-  function(accessToken, refreshToken, profile, done) {
-    pg.connect(DATABASE_URL, function(err, client, closeClient) {
-      if (err) console.log('Connection error', err);
-      client.query('select * from users where id=$1', [profile.id], function(err, result) {
-        if (err) console.log('Query error', err);
-        if (result.rows.length > 0) {
-          closeClient();
-          done(null, result.rows[0]);
-          return;
-        }
-        client.query('insert into users (id, display_name, profile_image_url) values ($1, $2, $3)', [profile.id, profile.displayName, profile.photos[0].value], function(err, result) {
-          closeClient();
-          if (err) console.log('Query error', err);
-          client.query('select * from users where id=$1', [profile.id], function(err, result) {
-            done(null, result.rows[0]);
-          });
-        });
-      });
-    });
-  }
-));
-
-app.use(cookieParser());
-app.use(bodyParser.urlencoded({ extended: false }));
-app.use(session({ secret: 'distillied', resave: false, saveUninitialized: false }));
-app.use(passport.initialize());
-app.use(passport.session());
-app.use('/static', express.static(__dirname + '/static'));
-
-app.get('/auth/facebook', passport.authenticate('facebook'));
-app.get('/auth/facebook/callback',
-  passport.authenticate('facebook', { successRedirect: '/',
-                                      failureRedirect: '/login' }));
-
-// app.use(flash());
 function requestLogger(req, res, next) {
   console.log(req.method + ' ' + req.url);
   next();
@@ -207,8 +150,8 @@ function safeStringify(obj) {
   return JSON.stringify(obj).replace(/<\/script/g, '<\\/script').replace(/<!--/g, '<\\!--')
 }
 function renderPage(component, data, req, res) {
-  if (req.isAuthenticated()) {
-    data.profileImage = req.user.profile_image_url;
+  if (req.user) {
+    data.userDisplayName = req.user.fullName;
   }
   res.setHeader('Content-Type', 'text/html');
   res.send(React.renderToStaticMarkup(
@@ -225,17 +168,6 @@ function renderPage(component, data, req, res) {
       )
     })));
 }
-
-
-app.get('/', function(req, res) {
-
-  var data = {};
-  data.content = {}
-  data.content.isLoggedIn = req.isAuthenticated();
-  data.logoMuted = true;
-
-  renderPage('Home', data, req, res);
-});
 
 function PartialQuery(sql, params) {
   this.sql = sql;
@@ -260,5 +192,44 @@ PartialQuery.prototype.toQuery = function(params, values) {
   return { text: sql, values: values };
 }
 var queries = {};
+
+
+app.get('/', function(req, res) {
+
+  var data = {};
+  data.content = {}
+  data.content.isLoggedIn = !!req.user;
+  data.logoMuted = true;
+
+  renderPage('Home', data, req, res);
+});
+
+
+app.get('/projects/new', function(req, res) {
+
+  var data = {};
+  data.content = {}
+  data.content.isLoggedIn = !!req.user;
+
+  renderPage('NewProject', data, req, res);
+});
+
+app.post('/projects/new', function(req, res) {
+
+  pg.connect(DATABASE_URL, function(err, client, closeClient) {
+    if (err) console.log('Connection error', err);
+    clientQuery(client, 'insert into projects (userid, name) values ($1, $2)',
+            [req.user.href, req.body.name])
+      .then(function(result) {
+        console.log('Insert res', result);
+        res.redirect('/');
+      });
+  });
+});
+
+app.post('/api/v1/upload', stormpath.apiAuthenticationRequired, multer({ dest: './uploads/' }), function(req, res) {
+  console.log(req.body);
+  res.send('OK');
+});
 
 app.listen(8080);
