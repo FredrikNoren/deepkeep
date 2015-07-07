@@ -1,6 +1,5 @@
 
 var React = require('react');
-var moment = require('moment');
 
 var P = 'home'; // style class name prefix
 

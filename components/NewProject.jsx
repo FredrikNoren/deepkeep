@@ -3,7 +3,7 @@ var React = require('react');
 
 var P = 'new-project';
 
-class NewProject extends React.Component {
+class User extends React.Component {
   render() {
     return (<section className={`${P} container`}>
       <form method="POST" action="/projects/new">
@@ -13,6 +13,6 @@ class NewProject extends React.Component {
     </section>)
   }
 }
-NewProject.classPrefix = P;
+User.classPrefix = P;
 
-module.exports = NewProject;
+module.exports = User;

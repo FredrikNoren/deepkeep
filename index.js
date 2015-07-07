@@ -42,6 +42,8 @@ app.use(stormpath.init(app, {
     apiKeyFile: 'apiKey-2RZ5G43WQYYMW6GFWTM865I17.properties',
     application: 'https://api.stormpath.com/v1/applications/6xIObjnyqyxBynY5R7shov',
     secretKey: 'some_long_random_string',
+    enableUsername: true,
+    requireUsername: true,
     debug: true
 }));
 
@@ -151,7 +153,8 @@ function safeStringify(obj) {
 }
 function renderPage(component, data, req, res) {
   if (req.user) {
-    data.userDisplayName = req.user.fullName;
+    data.profileName = req.user.username;
+    data.profileLink = '/' + req.user.username;
   }
   res.setHeader('Content-Type', 'text/html');
   res.send(React.renderToStaticMarkup(
@@ -230,6 +233,28 @@ app.post('/projects/new', function(req, res) {
 app.post('/api/v1/upload', stormpath.apiAuthenticationRequired, multer({ dest: './uploads/' }), function(req, res) {
   console.log(req.body);
   res.send('OK');
+});
+
+app.get('/:username', function(req, res) {
+
+  var data = {};
+  data.content = {};
+
+  pg.connect(DATABASE_URL, function(err, client, closeClient) {
+    if (err) console.log('Connection error', err);
+    clientQuery(client, 'select * from projects where userid=$1',
+            [req.user.href])
+      .then(function(result) {
+        console.log('Insert res', result);
+        data.content.projects = result.rows;
+        renderPage('User', data, req, res);
+      }).catch(function(err) {
+        console.log(err);
+        console.log(err.stack)
+        closeClient();
+        throw err;
+      });;
+  });
 });
 
 app.listen(8080);

@@ -7,10 +7,10 @@ var P = 'app'; // style class name prefix
 class App extends React.Component {
   render() {
     var profileSection = null;
-    if (this.props.userDisplayName) {
-      profileSection = <div style={{ display: 'flex' }}>
+    if (this.props.profileName) {
+      profileSection = <div>
         <a href="/projects/new" className="button">+ New project</a>
-        {this.props.userDisplayName}
+        <a href={this.props.profileLink}>{this.props.profileName}</a>
         <a href="/logout" className="button">Logout</a>
       </div>
     } else {
@@ -22,13 +22,13 @@ class App extends React.Component {
         <div className={`${P}-header`}>
           <div className="container">
             <div className={`${P}-right`}>
-              <div className={`${P}-search-input`}>
-                <input type="text" placeholder="Search" />
-                <i className="fa fa-search"></i>
-              </div>
               {profileSection}
             </div>
             <a href="/" className={classnames({ logo: true, muted: this.props.logoMuted })}>deep<span className="logo-stack">stack</span></a>
+            <div className={`${P}-search-input`}>
+              <input type="text" placeholder="Search" />
+              <i className="fa fa-search"></i>
+            </div>
             <span className="page-title">{this.props.pageTitle}</span>
           </div>
         </div>
@@ -49,12 +49,10 @@ App.styles = `
 
   .${P}-right {
     float: right;
-    display: flex;
   }
   .${P}-search-input {
-    margin-bottom: 8px;
-    display: flex;
-    align-items: center;
+    display: inline-block;
+    margin-left: 22px;
   }
 }
 `
