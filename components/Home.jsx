@@ -9,8 +9,11 @@ class AceHighlight extends React.Component {
       var editor = ace.edit(React.findDOMNode(this.refs.editor));
       editor.setTheme('ace/theme/monokai');
       editor.setOptions({
-          maxLines: Infinity
+          maxLines: Infinity,
+          showGutter: false,
+          readOnly: true
       });
+      editor.setTheme("ace/theme/github");
       editor.getSession().setMode(this.props.mode);
       editor.getSession().setTabSize(2);
       //editor.setReadOnly(true);
@@ -44,9 +47,9 @@ class Home extends React.Component {
       <div className="row container">
         <div className="six columns">
           <h4>Building and publishing a network</h4>
-          We'll build a simple xor network as an example. Start with creating a file
-          called train.lua and add this to it:
-          <AceHighlight mode="ace/mode/lua" code={
+          <p>We'll build a simple xor network as an example. Start with creating a file
+          called train.lua and add this to it:</p>
+          <p><AceHighlight mode="ace/mode/lua" code={
 `require 'torch'
 require 'nn'
 require 'nngraph'
@@ -82,59 +85,50 @@ while err > 0.001 do
 end
 
 -- And finally, we save it to disk
-torch.save('trained-network', net)
-`} />
-          Run it with
-          <pre className="shell" dangerouslySetInnerHTML={{__html:
+torch.save('trained-network', net)`} /></p>
+          <p>Run it with</p>
+          <p><pre className="shell" dangerouslySetInnerHTML={{__html:
           `th train.lua`
-          }} />
-          This will produce a file called "trained-network". You can now upload the
-          trained network to deepstack with the following command:
-          <pre className="shell" dangerouslySetInnerHTML={{__html:
-          `curl -u USERNAME -F "network=@trained-network" localhost:8080/api/v1/upload`
-          }} />
+          }} /></p>
+          <p>This will produce a file called "trained-network". You can now upload the
+          trained network to deepstack with the following command:</p>
+          <p><pre className="shell" dangerouslySetInnerHTML={{__html:
+`curl -u USERNAME -F "network=@trained-network" \\
+   localhost:8080/api/v1/upload`
+          }} /></p>
         </div>
 
         <div className="six columns">
-          <h4>Use a published network</h4>
-          Create a new directory, and start with downloading the trained network we
-          published before:
-          <pre className="shell" dangerouslySetInnerHTML={{__html:
+          <h4>Using a published network</h4>
+          <p>Create a new directory, and start with downloading the trained network we
+          published before:</p>
+          <p><pre className="shell" dangerouslySetInnerHTML={{__html:
           `curl -o net localhost:8080/FredrikNoren/xor/network`
-          }} />
-          Then create a file called "test.lua" and add the following to it:
-          <AceHighlight mode="ace/mode/lua" code={
+          }} /></p>
+          <p>Then create a file called "test.lua" and add the following to it:</p>
+          <p><AceHighlight mode="ace/mode/lua" code={
 `require 'torch'
 require 'nn'
 require 'nngraph'
 
+local T = torch.Tensor
 local net = torch.load('net')
 
-local verificationData = {
-  { x = torch.Tensor({ 0, 0 }), y = torch.Tensor({1}) },
-  { x = torch.Tensor({ 0, 1 }), y = torch.Tensor({0}) },
-  { x = torch.Tensor({ 1, 0 }), y = torch.Tensor({0}) },
-  { x = torch.Tensor({ 1, 1 }), y = torch.Tensor({1}) },
-}
-
-for i, d in pairs(verificationData) do
-  local x = torch.Tensor(d.x)
-  local yp = net:forward(x)
-  print(d.x[1] .. ' xor ' .. d.x[2] .. ' should be '
-    .. d.y[1] .. ' and the network predicted ' .. yp[1])
-end
-`} />
-        And finally run the program with
-        <pre className="shell" dangerouslySetInnerHTML={{__html:
+print('0 XOR 0 = ' .. net:forward(T({ 0, 0 }))[1])
+print('0 XOR 1 = ' .. net:forward(T({ 0, 1 }))[1])
+print('1 XOR 0 = ' .. net:forward(T({ 1, 0 }))[1])
+print('1 XOR 1 = ' .. net:forward(T({ 1, 1 }))[1])`} /></p>
+        <p>And finally run the program with</p>
+        <p><pre className="shell" dangerouslySetInnerHTML={{__html:
         `th test.lua`
-        }} />
-        If it all goes well you should see something like
-        <pre className="shell" dangerouslySetInnerHTML={{__html:
-`0 xor 0 should be 1 and the network predicted 0.98036088910045
-0 xor 1 should be 0 and the network predicted 0.0224844273406
-1 xor 0 should be 0 and the network predicted 0.034108989627501
-1 xor 1 should be 1 and the network predicted 0.9622292930384`
-        }} />
+        }} /></p>
+        <p>If it all goes well you should see something like</p>
+        <p><pre className="shell" dangerouslySetInnerHTML={{__html:
+`0 XOR 0 = 0.96583262167758
+0 XOR 1 = 0.03089587853588
+1 XOR 0 = 0.034721669536198
+1 XOR 1 = 0.98168738186416`
+        }} /></p>
       </div>
     </div>
   </div>
@@ -151,12 +145,6 @@ end
 Home.classPrefix = P;
 Home.styles = `
 .${P} {
-  h4 {
-    font-size: 20px;
-    color: #3F3F3F;
-    margin-top: 41px;
-    margin-bottom: 5px;
-  }
   .${P}-hero {
     text-align: center;
     margin-bottom: 56px;
@@ -184,15 +172,25 @@ Home.styles = `
     margin-bottom: 100px;
     .${P}-tutorial-inner {
       background: #ffffff;
-      color: #3F3F3F;
+      color: #222941;
+      h4 {
+        font-size: 20px;
+        color: #252847;
+        margin-top: 41px;
+        margin-bottom: 5px;
+      }
+      .ace_editor {
+        border: 1px solid #E0E0E0;
+      }
     }
   }
 }
 
 pre.shell {
-  background: #282828;
+  background: #343434;
   padding: 10px;
   color: #E2E2E2;
+  margin: 0px;
 }
 `
 
