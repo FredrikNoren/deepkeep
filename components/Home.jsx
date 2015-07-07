@@ -1,7 +1,6 @@
 
 var React = require('react');
 var moment = require('moment');
-var ReviewList = require('./ReviewList.jsx');
 
 var P = 'home'; // style class name prefix
 
@@ -28,13 +27,21 @@ class AceHighlight extends React.Component {
 
 class Home extends React.Component {
   render() {
-    return <section className={`${P} container`}>
-      <div className={`${P}-hero`}>
-        <div className="logo">deep<span className="logo-stack">stack</span></div>
-        <div className={`${P}-subtitle`}>The Neural Network Package Manager</div>
-      </div>
+    return (
+<section className={`${P}`}>
+  <div className={`${P}-hero container`}>
+    <div className="logo">deep<span className="logo-stack">stack</span></div>
+    <div className={`${P}-subtitle`}>The Neural Network Package Manager</div>
+  </div>
 
-      <div className="row">
+  <div className={`${P}-tutorial`}>
+
+    <svg width="1" height="1" style={{ width: '100%', height: 40}} preserveAspectRatio="none" viewBox="0 0 1 1">
+      <path d="M0 1 L1 0 L1 1 Z" fill="#ffffff" />
+    </svg>
+
+    <div className={`${P}-tutorial-inner`}>
+      <div className="row container">
         <div className="six columns">
           <h4>Building and publishing a network</h4>
           We'll build a simple xor network as an example. Start with creating a file
@@ -130,8 +137,15 @@ end
         }} />
       </div>
     </div>
+  </div>
 
-    </section>
+  <svg width="1" height="1" style={{ width: '100%', height: 10}} preserveAspectRatio="none" viewBox="0 0 1 1">
+    <path d="M0 0 L1 0 L1 1 Z" fill="#ffffff" />
+  </svg>
+
+</div>
+
+</section>)
   }
 }
 Home.classPrefix = P;
@@ -139,16 +153,16 @@ Home.styles = `
 .${P} {
   h4 {
     font-size: 20px;
-    color: #898989;
+    color: #3F3F3F;
     margin-top: 41px;
     margin-bottom: 5px;
   }
   .${P}-hero {
     text-align: center;
     margin-bottom: 56px;
-    margin-top: 31px;
+    margin-top: 57px;
     .logo {
-      font-size: 40px;
+      font-size: 60px;
       display: block;
     }
     .${P}-subtitle {
@@ -166,7 +180,15 @@ Home.styles = `
     margin-bottom: 14px;
     font-family: 'Open sans';
   }
+  .${P}-tutorial {
+    margin-bottom: 100px;
+    .${P}-tutorial-inner {
+      background: #ffffff;
+      color: #3F3F3F;
+    }
+  }
 }
+
 pre.shell {
   background: #282828;
   padding: 10px;
