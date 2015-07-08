@@ -9,6 +9,7 @@ var stormpath = require('express-stormpath');
 var multer  = require('multer')
 var less = require('less');
 var browserify = require('browserify');
+var aws = require('aws-sdk');
 var streamToBuffer = require('stream-to-buffer');
 var uuid = require('uuid');
 var pg = require('pg');
@@ -44,7 +45,11 @@ app.use(stormpath.init(app, {
     secretKey: 'some_long_random_string',
     enableUsername: true,
     requireUsername: true,
-    debug: true
+    debug: true,
+    postLoginHandler: function(account, req, res, next) {
+      account.id = stormpathUserHrefToId(account.href);
+      next();
+    }
 }));
 
 function requestLogger(req, res, next) {
@@ -224,8 +229,8 @@ app.post('/projects/new', function(req, res) {
 
   pg.connect(DATABASE_URL, function(err, client, closeClient) {
     if (err) console.log('Connection error', err);
-    clientQuery(client, 'insert into projects (userid, name) values ($1, $2)',
-            [req.user.href, req.body.name])
+    clientQuery(client, 'insert into projects (id, userhref, name) values ($1, $2, $3)',
+            [uuid.v1(), req.user.href, req.body.name])
       .then(function(result) {
         console.log('Insert res', result);
         res.redirect('/');
@@ -238,51 +243,117 @@ app.post('/api/v1/upload', stormpath.apiAuthenticationRequired, multer({ dest: '
   res.send('OK');
 });
 
-app.get('/:username', function(req, res) {
+var AWS_ACCESS_KEY = process.env.AWS_ACCESS_KEY;
+var AWS_SECRET_KEY = process.env.AWS_SECRET_KEY;
+var S3_BUCKET = process.env.S3_BUCKET;
 
-  var data = {};
-  data.content = {};
-
-  pg.connect(DATABASE_URL, function(err, client, closeClient) {
-    if (err) console.log('Connection error', err);
-    clientQuery(client, 'select * from projects where userid=$1',
-            [req.user.href])
-      .then(function(result) {
-        console.log('Insert res', result);
-        data.content.projects = result.rows.map(function(project) {
-          project.url = '/' + req.user.username + '/' + project.name;
-          return project;
+function signs3(destFileName, fileType) {
+  return new Promise(function(resolve, reject) {
+    aws.config.update({ accessKeyId: AWS_ACCESS_KEY, secretAccessKey: AWS_SECRET_KEY });
+    var s3 = new aws.S3();
+    var s3_params = {
+        Bucket: S3_BUCKET,
+        Key: destFileName,
+        Expires: 60,
+        ContentType: fileType,
+        ACL: 'public-read'
+    };
+    s3.getSignedUrl('putObject', s3_params, function(err, data){
+      if (err) {
+        reject(err);
+      } else {
+        resolve({
+            signedRequest: data,
+            url: 'https://' + S3_BUCKET + '.s3.amazonaws.com/' + destFileName
         });
-        renderPage('User', data, req, res);
-      }).catch(function(err) {
-        console.log(err);
-        console.log(err.stack)
-        closeClient();
-        throw err;
-      });;
+      }
+    });
   });
+}
+
+function lookupPathUser(req, res, next) {
+  req.app.get('stormpathApplication').getAccounts({ username: req.params.username }, function(err, accounts) {
+    req.pathUser = accounts.items[0];
+    req.pathUser.id = stormpathUserHrefToId(req.pathUser.href);
+    next();
+  });
+}
+
+function lookupPathProject(req, res, next) {
+  clientQuery(req.pgClient, 'select * from projects where userhref=$1 and name=$2',
+          [req.pathUser.href, req.params.project])
+    .then(function(result) {
+      req.pathProject = result.rows[0];
+      next();
+    }).catch(next);
+}
+
+function ensureUserOwned(req, res, next) {
+  if (!req.user || req.user.href != req.pathUser.href) {
+    res.status(401).send('Not authorized');
+  } else {
+    next();
+  }
+}
+
+function stormpathUserHrefToId(href) {
+  return href.substring('https://api.stormpath.com/v1/accounts/'.length);
+}
+
+function pgClient(req, res, next) {
+  pg.connect(DATABASE_URL, function(err, client, closeClient) {
+    if (err) {
+      console.log('Failed to connect to database', err);
+      res.status(500).send('Failed to connect to database');
+    } else {
+      req.pgClient = client;
+      req.pgCloseClient = closeClient;
+      next();
+    }
+  });
+}
+
+app.get('/:username/:project/newupload', pgClient, lookupPathUser, ensureUserOwned, lookupPathProject, function(req, res, next) {
+  var destFileName = req.pathUser.id + '-' + req.pathProject.id;
+  signs3(destFileName, req.query.file_type).then(function(sign) {
+    res.json(sign);
+  }).catch(next);
 });
 
-app.get('/:username/:project', function(req, res) {
+app.get('/:username', pgClient, function(req, res) {
 
   var data = {};
   data.content = {};
 
-  pg.connect(DATABASE_URL, function(err, client, closeClient) {
-    if (err) console.log('Connection error', err);
-    clientQuery(client, 'select * from projects where userid=$1 and name=$2',
-            [req.user.href, req.params.project])
-      .then(function(result) {
-        console.log('Insert res', result);
-        data.content.name = result.rows[0].name;
-        renderPage('Project', data, req, res);
-      }).catch(function(err) {
-        console.log(err);
-        console.log(err.stack)
-        closeClient();
-        throw err;
-      });;
-  });
+  clientQuery(req.pgClient, 'select * from projects where userhref=$1',
+          [req.user.href])
+    .then(function(result) {
+      req.pgCloseClient();
+      console.log('Insert res', result);
+      data.content.projects = result.rows.map(function(project) {
+        project.url = '/' + req.user.username + '/' + project.name;
+        return project;
+      });
+      renderPage('User', data, req, res);
+    }).catch(function(err) {
+      console.log(err);
+      console.log(err.stack)
+      req.pgCloseClient();
+      throw err;
+    });
+});
+
+app.get('/:username/:project', pgClient, lookupPathUser, lookupPathProject, function(req, res) {
+  var data = {};
+  data.content = {};
+  data.content.username = req.params.username;
+  data.content.project = req.params.project;
+
+  data.content.name = req.pathProject.name;
+  var destFileName = req.pathUser.id + '-' + req.pathProject.id;
+  data.content.modelFilePath = 'https://' + S3_BUCKET + '.s3.amazonaws.com/' + destFileName;
+  renderPage('Project', data, req, res);
+  req.pgCloseClient();
 });
 
 var port = process.env.PORT || 8080;

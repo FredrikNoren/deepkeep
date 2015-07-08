@@ -1,4 +1,4 @@
 
 DROP TABLE IF EXISTS projects;
 
-CREATE TABLE projects (id VARCHAR(256), userid VARCHAR(256), name VARCHAR(256));
+CREATE TABLE projects (id VARCHAR(256), userhref VARCHAR(256), name VARCHAR(256));
