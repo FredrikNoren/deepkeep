@@ -207,6 +207,9 @@ app.get('/', function(req, res) {
   renderPage('Home', data, req, res);
 });
 
+app.get('/favicon.ico', function(req, res) {
+  res.status(404).send('Not found');
+});
 
 app.get('/projects/new', function(req, res) {
 
