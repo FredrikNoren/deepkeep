@@ -25,7 +25,7 @@ class Project extends React.Component {
       });
   }
   render() {
-    var readmeHtml = marked('_hi_');
+    var readmeHtml = marked(this.props.readme);
     return (<section className={`${P} container`}>
       <div className={`${P}-header`}>
         <i className="fa fa-cube"></i>
@@ -35,16 +35,14 @@ class Project extends React.Component {
       </div>
       <div className="row">
         <div className="ten columns">
-          <div className={`${P}-readme`} dangerouslySetInnerHTML={{__html: readmeHtml }} />
-          Upload new model: <input type="file" ref="file" onChange={this.fileChanged.bind(this)}/>{this.state.uploadState}
           <p>
-            <a className="button" href={this.props.modelFilePath}>Download model</a>
+            <a href={this.props.downloadPath}>Download model version {this.props.version}</a>
           </p>
+          <p className={`${P}-readme`} dangerouslySetInnerHTML={{__html: readmeHtml }} />
         </div>
         <div className="two columns">
           <b>Versions</b>
-          <div><a href="#" onClick={() => alert('lol')}>+ New version</a></div>
-          {['0.9','0.8','0.7'].map(version => {
+          {this.props.versions.map(version => {
             return <div>{version}</div>
           })}
         </div>

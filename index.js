@@ -71,25 +71,6 @@ app.get('/reset', function(req, res) {
   });
 });
 
-function pgQuery(sql, params) {
-  return new Promse(function(resolve, reject) {
-    pg.connect(DATABASE_URL, function(err, client, closeClient) {
-      if (err) return reject(err);
-      client.query('insert into dna (sequence) values ($1)', ['lol'], function(err, result) {
-        closeClient();
-        if (err) return reject(err);
-        console.log('Res', result);
-        client.query('select * from dna', function(err, result) {
-          if (err) console.log('Query error', err);
-          console.log('Res', result);
-          res.json(result.rows);
-          closeClient();
-        });
-      });
-    });
-  });
-}
-
 function clientQuery(client, sql, params) {
   return new Promise(function(resolve, reject) {
     var handler = function(err, result) {
@@ -240,7 +221,7 @@ app.post('/projects/new', function(req, res) {
   });
 });
 
-app.post('/api/v1/upload', multer({ dest: './uploads/' }), function(req, res) {
+app.post('/api/v1/upload', multer({ dest: './uploads/' }), pgClient, function(req, res, next) {
   console.log(req.files);
   var user = auth(req);
   req.app.get('stormpathApplication').authenticateAccount({
@@ -251,29 +232,39 @@ app.post('/api/v1/upload', multer({ dest: './uploads/' }), function(req, res) {
       res.status(401).send(err.userMessage);
       return;
     }
-    var zip = new AdmZip(req.files.package.path);
-    var packageJson = zip.readAsText('package.json');
-    try {
-      packageJson = JSON.parse(packageJson);
-    } catch(err) {
-      res.status(400).send('Could not parse package.json');
-      return;
-    }
-    console.log(packageJson);
-    var body = fs.createReadStream(req.files.package.path);
-    var s3obj = new aws.S3({
-      params: {
-        Bucket: S3_BUCKET,
-        Key: user.name + '-' + packageJson.name + '-' + packageJson.version + '.zip',
-        'x-amz-acl': 'public-read'
+    req.app.get('stormpathApplication').getAccounts({ username: req.params.username }, function(err, accounts) {
+      var stormpathUser = accounts.items[0];
+      stormpathUser.id = stormpathUserHrefToId(stormpathUser.href);
+
+      var zip = new AdmZip(req.files.package.path);
+      var packageJson = zip.readAsText('package.json');
+      try {
+        packageJson = JSON.parse(packageJson);
+      } catch(err) {
+        res.status(400).send('Could not parse package.json');
+        return;
       }
-    });
-    s3obj.upload({ Body: body }).
-      on('httpUploadProgress', function(evt) { console.log(evt); }).
-      send(function(err, data) {
-        console.log('DONE', err, data);
-        res.send('OK');
+      console.log(packageJson);
+      var body = fs.createReadStream(req.files.package.path);
+      var s3obj = new aws.S3({
+        params: {
+          Bucket: S3_BUCKET,
+          Key: stormpathUser.id + '-' + packageJson.name + '-' + packageJson.version + '.zip',
+          ACL: 'public-read'
+        }
       });
+      s3obj.upload({ Body: body }).
+        on('httpUploadProgress', function(evt) { console.log(evt); }).
+        send(function(err, data) {
+          clientQuery(req.pgClient, 'insert into cached_project_versions (id, userid, name, version, readme) values ($1, $2, $3, $4, $5)',
+                  [uuid.v1(), stormpathUser.id, packageJson.name, packageJson.version, packageJson.readme])
+            .then(function(result) {
+              console.log('DONE', result);
+              res.send('OK');
+              req.pgCloseClient();
+            }).catch(next);
+        });
+    });
   });
 });
 
@@ -281,28 +272,7 @@ var AWS_ACCESS_KEY = process.env.AWS_ACCESS_KEY;
 var AWS_SECRET_KEY = process.env.AWS_SECRET_KEY;
 var S3_BUCKET = process.env.S3_BUCKET;
 aws.config.update({ accessKeyId: AWS_ACCESS_KEY, secretAccessKey: AWS_SECRET_KEY });
-var s3 = new aws.S3({ params: {  Bucket: S3_BUCKET }});
-
-function signs3(destFileName, fileType) {
-  return new Promise(function(resolve, reject) {
-    var s3_params = {
-        Key: destFileName,
-        Expires: 60,
-        ContentType: fileType,
-        ACL: 'public-read'
-    };
-    s3.getSignedUrl('putObject', s3_params, function(err, data){
-      if (err) {
-        reject(err);
-      } else {
-        resolve({
-            signedRequest: data,
-            url: 'https://' + S3_BUCKET + '.s3.amazonaws.com/' + destFileName
-        });
-      }
-    });
-  });
-}
+var s3 = new aws.S3({ params: { Bucket: S3_BUCKET }});
 
 function lookupPathUser(req, res, next) {
   req.app.get('stormpathApplication').getAccounts({ username: req.params.username }, function(err, accounts) {
@@ -310,15 +280,6 @@ function lookupPathUser(req, res, next) {
     req.pathUser.id = stormpathUserHrefToId(req.pathUser.href);
     next();
   });
-}
-
-function lookupPathProject(req, res, next) {
-  clientQuery(req.pgClient, 'select * from projects where userhref=$1 and name=$2',
-          [req.pathUser.href, req.params.project])
-    .then(function(result) {
-      req.pathProject = result.rows[0];
-      next();
-    }).catch(next);
 }
 
 function ensureUserOwned(req, res, next) {
@@ -346,14 +307,6 @@ function pgClient(req, res, next) {
   });
 }
 
-app.get('/:username/:project/newupload', pgClient, lookupPathUser, ensureUserOwned, lookupPathProject, function(req, res, next) {
-  var destFileName = req.pathUser.id + '-' + req.pathProject.id;
-  signs3(destFileName, req.query.file_type).then(function(sign) {
-    res.json(sign);
-  }).catch(next);
-});
-
-
 app.get('/:username', pgClient, function(req, res) {
 
   var data = {};
@@ -377,17 +330,27 @@ app.get('/:username', pgClient, function(req, res) {
     });
 });
 
-app.get('/:username/:project', pgClient, lookupPathUser, lookupPathProject, function(req, res) {
+app.get('/:username/:project', pgClient, lookupPathUser, function(req, res, next) {
   var data = {};
   data.content = {};
   data.content.username = req.params.username;
   data.content.project = req.params.project;
 
-  data.content.name = req.pathProject.name;
-  var destFileName = req.pathUser.id + '-' + req.pathProject.id;
-  data.content.modelFilePath = 'https://' + S3_BUCKET + '.s3.amazonaws.com/' + destFileName;
-  renderPage('Project', data, req, res);
-  req.pgCloseClient();
+  console.log('USERID', req.pathUser.id)
+  console.log('PROJECT', req.params.project)
+  clientQuery(req.pgClient, 'select * from cached_project_versions where userid=$1 and name=$2 order by version',
+          [req.pathUser.id, req.params.project])
+    .then(function(result) {
+      req.pgCloseClient();
+      //console.log('Insert res', result);
+      data.content.versions = result.rows.map(function(project) {
+        return project.version;
+      });
+      data.content.readme = result.rows[0].readme;
+      data.content.version = result.rows[0].version;
+      data.content.downloadPath = 'https://' + S3_BUCKET + '.s3.amazonaws.com/' + req.pathUser.id + '-' + req.params.project + '-' + data.content.version + '.zip'
+      renderPage('Project', data, req, res);
+    }).catch(next);
 });
 
 var port = process.env.PORT || 8080;
