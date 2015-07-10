@@ -84,17 +84,31 @@ while err > 0.001 do
 end
 
 -- And finally, we save it to disk
-torch.save('trained-network', net)`} /></p>
+torch.save('trained-network.t7', net)`} /></p>
           <p>Run it with</p>
           <p><pre className="shell" dangerouslySetInnerHTML={{__html:
           `th train.lua`
           }} /></p>
-          <p>This will produce a file called "trained-network". You can now upload the
-          trained network to deepstack with the following command:</p>
+        <p>This will produce a file called "trained-network.t7". Next we create a
+        file called package.json, which contains information about this trained
+        model. Create a file called "package.json" and add the following to it:</p>
+        <p><AceHighlight mode="ace/mode/json" code={
+`{
+  "name": "xor",
+  "version": "0.1",
+  "readme": "This package provides a network that can compute xor.",
+  "model": "trained-network.t7"
+}`} /></p>
+          <p>Next we package the two files up together:</p>
           <p><pre className="shell" dangerouslySetInnerHTML={{__html:
-`curl -u USERNAME -F "network=@trained-network" \\
-   localhost:8080/api/v1/upload`
+          `zip package.0.1.zip package.json trained-network.t7`
           }} /></p>
+          <p>And finally we'll upload the package to deepstack:</p>
+          <p><pre className="shell" dangerouslySetInnerHTML={{__html:
+`curl -u USERNAME -F "package=@package.0.1.zip" \\
+   localhost:5000/api/v1/upload`
+          }} /></p>
+          <p>Done!</p>
         </div>
 
         <div className="six columns">

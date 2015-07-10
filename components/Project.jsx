@@ -1,6 +1,7 @@
 
 var React = require('react');
 var http = require('../client/http');
+var marked = require('marked');
 
 var P = 'project';
 
@@ -24,15 +25,47 @@ class Project extends React.Component {
       });
   }
   render() {
+    var readmeHtml = marked('_hi_');
     return (<section className={`${P} container`}>
-      <h1>{this.props.name}</h1>
-      Upload new model: <input type="file" ref="file" onChange={this.fileChanged.bind(this)}/>{this.state.uploadState}
-      <p>
-        <a className="button" href={this.props.modelFilePath}>Download model</a>
-      </p>
+      <div className={`${P}-header`}>
+        <i className="fa fa-cube"></i>
+        <a href={'/' + this.props.username} className={`${P}-username`}>{this.props.username}</a>
+        /
+        <a href={'/' + this.props.username + '/' + this.props.project} className={`${P}-project`}>{this.props.project}</a>
+      </div>
+      <div className="row">
+        <div className="ten columns">
+          <div className={`${P}-readme`} dangerouslySetInnerHTML={{__html: readmeHtml }} />
+          Upload new model: <input type="file" ref="file" onChange={this.fileChanged.bind(this)}/>{this.state.uploadState}
+          <p>
+            <a className="button" href={this.props.modelFilePath}>Download model</a>
+          </p>
+        </div>
+        <div className="two columns">
+          <b>Versions</b>
+          <div><a href="#" onClick={() => alert('lol')}>+ New version</a></div>
+          {['0.9','0.8','0.7'].map(version => {
+            return <div>{version}</div>
+          })}
+        </div>
+      </div>
     </section>)
   }
 }
 Project.classPrefix = P;
+Project.styles = `
+.${P}-header {
+  font-size: 20px;
+  .${P}-username {
+    color: #C8AB77;
+    margin-left: 10px;
+    margin-right: 10px;
+  }
+  .${P}-project {
+    font-weight: bold;
+    margin-left: 10px;
+  }
+}
+`
 
 module.exports = Project;

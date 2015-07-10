@@ -8,7 +8,9 @@ var merge = require('merge');
 var stormpath = require('express-stormpath');
 var multer  = require('multer')
 var less = require('less');
+var AdmZip = require('adm-zip');
 var browserify = require('browserify');
+var auth = require('basic-auth');
 var aws = require('aws-sdk');
 var streamToBuffer = require('stream-to-buffer');
 var uuid = require('uuid');
@@ -238,21 +240,52 @@ app.post('/projects/new', function(req, res) {
   });
 });
 
-app.post('/api/v1/upload', stormpath.apiAuthenticationRequired, multer({ dest: './uploads/' }), function(req, res) {
-  console.log(req.body);
-  res.send('OK');
+app.post('/api/v1/upload', multer({ dest: './uploads/' }), function(req, res) {
+  console.log(req.files);
+  var user = auth(req);
+  req.app.get('stormpathApplication').authenticateAccount({
+    username: user.name,
+    password: user.pass
+  }, function(err, result) {
+    if (err) {
+      res.status(401).send(err.userMessage);
+      return;
+    }
+    var zip = new AdmZip(req.files.package.path);
+    var packageJson = zip.readAsText('package.json');
+    try {
+      packageJson = JSON.parse(packageJson);
+    } catch(err) {
+      res.status(400).send('Could not parse package.json');
+      return;
+    }
+    console.log(packageJson);
+    var body = fs.createReadStream(req.files.package.path);
+    var s3obj = new aws.S3({
+      params: {
+        Bucket: S3_BUCKET,
+        Key: user.name + '-' + packageJson.name + '-' + packageJson.version + '.zip',
+        'x-amz-acl': 'public-read'
+      }
+    });
+    s3obj.upload({ Body: body }).
+      on('httpUploadProgress', function(evt) { console.log(evt); }).
+      send(function(err, data) {
+        console.log('DONE', err, data);
+        res.send('OK');
+      });
+  });
 });
 
 var AWS_ACCESS_KEY = process.env.AWS_ACCESS_KEY;
 var AWS_SECRET_KEY = process.env.AWS_SECRET_KEY;
 var S3_BUCKET = process.env.S3_BUCKET;
+aws.config.update({ accessKeyId: AWS_ACCESS_KEY, secretAccessKey: AWS_SECRET_KEY });
+var s3 = new aws.S3({ params: {  Bucket: S3_BUCKET }});
 
 function signs3(destFileName, fileType) {
   return new Promise(function(resolve, reject) {
-    aws.config.update({ accessKeyId: AWS_ACCESS_KEY, secretAccessKey: AWS_SECRET_KEY });
-    var s3 = new aws.S3();
     var s3_params = {
-        Bucket: S3_BUCKET,
         Key: destFileName,
         Expires: 60,
         ContentType: fileType,
@@ -319,6 +352,7 @@ app.get('/:username/:project/newupload', pgClient, lookupPathUser, ensureUserOwn
     res.json(sign);
   }).catch(next);
 });
+
 
 app.get('/:username', pgClient, function(req, res) {
 
