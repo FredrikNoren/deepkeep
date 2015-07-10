@@ -199,28 +199,6 @@ app.get('/favicon.ico', function(req, res) {
   res.status(404).send('Not found');
 });
 
-app.get('/projects/new', function(req, res) {
-
-  var data = {};
-  data.content = {}
-  data.content.isLoggedIn = !!req.user;
-
-  renderPage('NewProject', data, req, res);
-});
-
-app.post('/projects/new', function(req, res) {
-
-  pg.connect(DATABASE_URL, function(err, client, closeClient) {
-    if (err) console.log('Connection error', err);
-    clientQuery(client, 'insert into projects (id, userhref, name) values ($1, $2, $3)',
-            [uuid.v1(), req.user.href, req.body.name])
-      .then(function(result) {
-        console.log('Insert res', result);
-        res.redirect('/');
-      });
-  });
-});
-
 app.post('/api/v1/upload', multer({ dest: './uploads/' }), pgClient, function(req, res, next) {
   console.log(req.files);
   var user = auth(req);

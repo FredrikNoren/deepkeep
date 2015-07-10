@@ -9,7 +9,6 @@ class App extends React.Component {
     var profileSection = null;
     if (this.props.profileName) {
       profileSection = <div>
-        <a href="/projects/new" className="button">+ New project</a>
         <a href={this.props.profileLink}>{this.props.profileName}</a>
         <a href="/logout" className="button">Logout</a>
       </div>
