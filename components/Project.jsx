@@ -36,9 +36,10 @@ class Project extends React.Component {
       <div className="row">
         <div className="ten columns">
           <p>
-            <a href={this.props.downloadPath}>Download model version {this.props.version}</a>
+            <a className="button" href={this.props.downloadPath}>Download model version {this.props.version}</a>
           </p>
-          <p className={`${P}-readme`} dangerouslySetInnerHTML={{__html: readmeHtml }} />
+          <div className={`${P}-readme-title`}>README</div>
+          <div className={`${P}-readme`} dangerouslySetInnerHTML={{__html: readmeHtml }} />
         </div>
         <div className="two columns">
           <b>Versions</b>
@@ -63,6 +64,23 @@ Project.styles = `
     font-weight: bold;
     margin-left: 10px;
   }
+}
+.${P}-readme-title {
+  background: rgba(0, 0, 0, 0.08);
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.18);
+  padding: 5px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-bottom: 0px;
+  border-top-left-radius: 5px;
+  border-top-right-radius: 5px;
+}
+.${P}-readme {
+  background: rgba(0, 0, 0, 0.06);
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-bottom-left-radius: 5px;
+  border-bottom-right-radius: 5px;
 }
 `
 

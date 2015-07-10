@@ -256,8 +256,8 @@ app.post('/api/v1/upload', multer({ dest: './uploads/' }), pgClient, function(re
       s3obj.upload({ Body: body }).
         on('httpUploadProgress', function(evt) { console.log(evt); }).
         send(function(err, data) {
-          clientQuery(req.pgClient, 'insert into cached_project_versions (id, userid, name, version, readme) values ($1, $2, $3, $4, $5)',
-                  [uuid.v1(), stormpathUser.id, packageJson.name, packageJson.version, packageJson.readme])
+          clientQuery(req.pgClient, 'insert into cached_project_versions (userid, name, version, readme) values ($1, $2, $3, $4)',
+                  [stormpathUser.id, packageJson.name, packageJson.version, packageJson.readme])
             .then(function(result) {
               console.log('DONE', result);
               res.send('OK');
@@ -307,27 +307,22 @@ function pgClient(req, res, next) {
   });
 }
 
-app.get('/:username', pgClient, function(req, res) {
+app.get('/:username', pgClient, lookupPathUser, function(req, res, next) {
 
   var data = {};
   data.content = {};
 
-  clientQuery(req.pgClient, 'select * from projects where userhref=$1',
-          [req.user.href])
+  clientQuery(req.pgClient, 'select name from cached_project_versions where userid=$1 group by name',
+          [req.pathUser.id])
     .then(function(result) {
       req.pgCloseClient();
       console.log('Insert res', result);
       data.content.projects = result.rows.map(function(project) {
-        project.url = '/' + req.user.username + '/' + project.name;
+        project.url = '/' + req.pathUser.username + '/' + project.name;
         return project;
       });
       renderPage('User', data, req, res);
-    }).catch(function(err) {
-      console.log(err);
-      console.log(err.stack)
-      req.pgCloseClient();
-      throw err;
-    });
+    }).catch(next);
 });
 
 app.get('/:username/:project', pgClient, lookupPathUser, function(req, res, next) {
@@ -338,7 +333,7 @@ app.get('/:username/:project', pgClient, lookupPathUser, function(req, res, next
 
   console.log('USERID', req.pathUser.id)
   console.log('PROJECT', req.params.project)
-  clientQuery(req.pgClient, 'select * from cached_project_versions where userid=$1 and name=$2 order by version',
+  clientQuery(req.pgClient, 'select * from cached_project_versions where userid=$1 and name=$2 order by version desc',
           [req.pathUser.id, req.params.project])
     .then(function(result) {
       req.pgCloseClient();
