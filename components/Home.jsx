@@ -1,31 +1,134 @@
 
 var React = require('react');
+var marked = require('marked');
+
+marked.setOptions({
+  highlight: function (code, lang) {
+    return require('highlight.js').highlight(lang, code).value;
+  }
+});
 
 var P = 'home'; // style class name prefix
 
-class AceHighlight extends React.Component {
-    componentDidMount() {
-      var editor = ace.edit(React.findDOMNode(this.refs.editor));
-      editor.setTheme('ace/theme/monokai');
-      editor.setOptions({
-          maxLines: Infinity,
-          showGutter: false,
-          readOnly: true
-      });
-      editor.setTheme("ace/theme/github");
-      editor.getSession().setMode(this.props.mode);
-      editor.getSession().setTabSize(2);
-      //editor.setReadOnly(true);
-      editor.setHighlightActiveLine(false);
-      editor.setShowPrintMargin(false);
-      editor.setValue(this.props.code, 1);
-      editor.resize();
-      editor.blur();
-    }
-    render() {
-      return <div ref="editor" />;
-    }
+var buildingAndPublishingDoc = `
+### Building and publishing a network
+We'll build a simple xor network as an example. Start with creating a file
+called \`train.lua\` and add this to it:
+
+\`\`\`lua
+require 'torch'
+require 'nn'
+require 'nngraph'
+
+-- First let's define our network
+local node_x = nn.Linear(2, 3)()
+local node_y = nn.Linear(3, 1)(nn.Tanh()(node_x))
+local net = nn.gModule({ node_x }, { node_y })
+
+-- Then some trainging data that we will use to train
+-- this model
+local trainingData = {
+{ x = torch.Tensor({ 0, 0 }), y = torch.Tensor({1}) },
+{ x = torch.Tensor({ 0, 1 }), y = torch.Tensor({0}) },
+{ x = torch.Tensor({ 1, 0 }), y = torch.Tensor({0}) },
+{ x = torch.Tensor({ 1, 1 }), y = torch.Tensor({1}) },
 }
+local criterion = nn.MSECriterion()
+
+-- Ok, let's train it!
+local err = 1
+while err > 0.001 do
+err = 0
+for i, d in pairs(trainingData) do
+err = err + criterion:forward(net:forward(d.x), d.y)
+net:zeroGradParameters()
+net:backward(input,
+criterion:backward(net.output, d.y))
+net:updateParameters(0.01)
+end
+err = err / #trainingData
+print("Training... Current network error: " .. err)
+end
+
+-- And finally, we save it to disk
+torch.save('trained-network.t7', net)
+\`\`\`
+
+Run it with
+
+\`\`\`bash
+th train.lua
+\`\`\`
+
+This will produce a file called \`trained-network.t7\`. Next we create a
+file called package.json, which contains information about this trained
+model. Create a file called \`package.json\` and add the following to it:
+
+\`\`\`json
+{
+"name": "xor",
+"version": "0.1",
+"readme": "This package provides a network that can compute xor.",
+"model": "trained-network.t7"
+}
+\`\`\`
+
+Next we package the two files up together:
+
+\`\`\`bash
+zip package.0.1.zip package.json trained-network.t7
+\`\`\`
+
+And finally we'll upload the package to deepstack:
+
+\`\`\`bash
+curl -u USERNAME -F "package=@package.0.1.zip" \\
+localhost:5000/api/v1/upload
+\`\`\`
+
+Done!
+`
+
+var usingDoc = `
+### Using a published network
+Create a new directory, and start with downloading the trained network we
+published before:
+
+\`\`\`bash
+curl -o net localhost:8080/FredrikNoren/xor/network
+\`\`\`
+
+Then create a file called "test.lua" and add the following to it:
+
+\`\`\`lua
+require 'torch'
+require 'nn'
+require 'nngraph'
+
+local T = torch.Tensor
+local net = torch.load('net')
+
+print('0 XOR 0 = ' .. net:forward(T({ 0, 0 }))[1])
+print('0 XOR 1 = ' .. net:forward(T({ 0, 1 }))[1])
+print('1 XOR 0 = ' .. net:forward(T({ 1, 0 }))[1])
+print('1 XOR 1 = ' .. net:forward(T({ 1, 1 }))[1])
+\`\`\`
+
+And finally run the program with
+
+\`\`\`bash
+th test.lua
+\`\`\`
+
+If it all goes well you should see something like
+
+\`\`\`bash
+0 XOR 0 = 0.96583262167758
+0 XOR 1 = 0.03089587853588
+1 XOR 0 = 0.034721669536198
+1 XOR 1 = 0.98168738186416
+\`\`\`
+`
 
 class Home extends React.Component {
   render() {
@@ -45,112 +148,20 @@ class Home extends React.Component {
     <div className={`${P}-tutorial-inner`}>
       <div className="row container">
         <div className="six columns">
-          <h4>Building and publishing a network</h4>
-          <p>We'll build a simple xor network as an example. Start with creating a file
-          called train.lua and add this to it:</p>
-          <p><AceHighlight mode="ace/mode/lua" code={
-`require 'torch'
-require 'nn'
-require 'nngraph'
-
--- First let's define our network
-local node_x = nn.Linear(2, 3)()
-local node_y = nn.Linear(3, 1)(nn.Tanh()(node_x))
-local net = nn.gModule({ node_x }, { node_y })
-
--- Then some trainging data that we will use to train
--- this model
-local trainingData = {
-  { x = torch.Tensor({ 0, 0 }), y = torch.Tensor({1}) },
-  { x = torch.Tensor({ 0, 1 }), y = torch.Tensor({0}) },
-  { x = torch.Tensor({ 1, 0 }), y = torch.Tensor({0}) },
-  { x = torch.Tensor({ 1, 1 }), y = torch.Tensor({1}) },
-}
-local criterion = nn.MSECriterion()
-
--- Ok, let's train it!
-local err = 1
-while err > 0.001 do
-  err = 0
-  for i, d in pairs(trainingData) do
-    err = err + criterion:forward(net:forward(d.x), d.y)
-    net:zeroGradParameters()
-    net:backward(input,
-      criterion:backward(net.output, d.y))
-    net:updateParameters(0.01)
-  end
-  err = err / #trainingData
-  print("Training... Current network error: " .. err)
-end
-
--- And finally, we save it to disk
-torch.save('trained-network.t7', net)`} /></p>
-          <p>Run it with</p>
-          <p><pre className="shell" dangerouslySetInnerHTML={{__html:
-          `th train.lua`
-          }} /></p>
-        <p>This will produce a file called "trained-network.t7". Next we create a
-        file called package.json, which contains information about this trained
-        model. Create a file called "package.json" and add the following to it:</p>
-        <p><AceHighlight mode="ace/mode/json" code={
-`{
-  "name": "xor",
-  "version": "0.1",
-  "readme": "This package provides a network that can compute xor.",
-  "model": "trained-network.t7"
-}`} /></p>
-          <p>Next we package the two files up together:</p>
-          <p><pre className="shell" dangerouslySetInnerHTML={{__html:
-          `zip package.0.1.zip package.json trained-network.t7`
-          }} /></p>
-          <p>And finally we'll upload the package to deepstack:</p>
-          <p><pre className="shell" dangerouslySetInnerHTML={{__html:
-`curl -u USERNAME -F "package=@package.0.1.zip" \\
-   localhost:5000/api/v1/upload`
-          }} /></p>
-          <p>Done!</p>
+          <div dangerouslySetInnerHTML={{ __html: marked(buildingAndPublishingDoc) }} />
         </div>
 
         <div className="six columns">
-          <h4>Using a published network</h4>
-          <p>Create a new directory, and start with downloading the trained network we
-          published before:</p>
-          <p><pre className="shell" dangerouslySetInnerHTML={{__html:
-          `curl -o net localhost:8080/FredrikNoren/xor/network`
-          }} /></p>
-          <p>Then create a file called "test.lua" and add the following to it:</p>
-          <p><AceHighlight mode="ace/mode/lua" code={
-`require 'torch'
-require 'nn'
-require 'nngraph'
-
-local T = torch.Tensor
-local net = torch.load('net')
-
-print('0 XOR 0 = ' .. net:forward(T({ 0, 0 }))[1])
-print('0 XOR 1 = ' .. net:forward(T({ 0, 1 }))[1])
-print('1 XOR 0 = ' .. net:forward(T({ 1, 0 }))[1])
-print('1 XOR 1 = ' .. net:forward(T({ 1, 1 }))[1])`} /></p>
-        <p>And finally run the program with</p>
-        <p><pre className="shell" dangerouslySetInnerHTML={{__html:
-        `th test.lua`
-        }} /></p>
-        <p>If it all goes well you should see something like</p>
-        <p><pre className="shell" dangerouslySetInnerHTML={{__html:
-`0 XOR 0 = 0.96583262167758
-0 XOR 1 = 0.03089587853588
-1 XOR 0 = 0.034721669536198
-1 XOR 1 = 0.98168738186416`
-        }} /></p>
+          <div dangerouslySetInnerHTML={{ __html: marked(usingDoc) }} />
+        </div>
       </div>
     </div>
+
+    <svg width="1" height="1" style={{ width: '100%', height: 10}} preserveAspectRatio="none" viewBox="0 0 1 1">
+      <path d="M0 0 L1 0 L1 1 Z" fill="#ffffff" />
+    </svg>
+
   </div>
-
-  <svg width="1" height="1" style={{ width: '100%', height: 10}} preserveAspectRatio="none" viewBox="0 0 1 1">
-    <path d="M0 0 L1 0 L1 1 Z" fill="#ffffff" />
-  </svg>
-
-</div>
 
 </section>)
   }
