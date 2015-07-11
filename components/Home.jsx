@@ -94,11 +94,11 @@ Done!
 
 var usingDoc = `
 ### Using a published network
-Create a new directory, and start with downloading the trained network we
+Create a new directory, and start with downloading and extracting the trained network we
 published before:
 
 \`\`\`bash
-curl -LO ${this.props.host}/FredrikNoren/xor/package.zip
+curl -LO ${this.props.host}/FredrikNoren/xor/package.zip && unzip package.zip -d xor && rm package.zip
 \`\`\`
 
 Then create a file called \`test.lua\` and add the following to it:
@@ -109,7 +109,7 @@ require 'nn'
 require 'nngraph'
 
 local T = torch.Tensor
-local net = torch.load('net')
+local net = torch.load('xor/trained-network.t7')
 
 print('0 XOR 0 = ' .. net:forward(T({ 0, 0 }))[1])
 print('0 XOR 1 = ' .. net:forward(T({ 0, 1 }))[1])
