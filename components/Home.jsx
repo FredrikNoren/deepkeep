@@ -70,22 +70,33 @@ model. Create a file called \`package.json\` and add the following to it:
 \`\`\`json
 {
 "name": "xor",
-"version": "0.1",
-"readme": "This package provides a network that can compute xor.",
+"version": "1.0",
 "model": "trained-network.t7"
 }
 \`\`\`
 
-Next we package the two files up together:
+Let's also create a \`README.md\` file:
+
+\`\`\`md
+# xor
+
+This package provides a network that can compute xor.
+
+## Usage
+
+__Add usage instructions here__
+\`\`\`
+
+Next we package the three files up together:
 
 \`\`\`bash
-zip package.0.1.zip package.json trained-network.t7
+zip package.1.0.zip package.json README.md trained-network.t7
 \`\`\`
 
 And finally we'll upload the package to deepstack:
 
 \`\`\`bash
-curl -u USERNAME -F "package=@package.0.1.zip" \\
+curl -u USERNAME -F "package=@package.1.0.zip" \\
 ${this.props.host}/api/v1/upload
 \`\`\`
 
@@ -98,7 +109,9 @@ Create a new directory, and start with downloading and extracting the trained ne
 published before:
 
 \`\`\`bash
-curl -LO ${this.props.host}/FredrikNoren/xor/package.zip && unzip package.zip -d xor && rm package.zip
+curl -LO ${this.props.host}/FredrikNoren/xor/package.zip
+unzip package.zip -d xor
+rm package.zip
 \`\`\`
 
 Then create a file called \`test.lua\` and add the following to it:

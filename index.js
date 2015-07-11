@@ -241,6 +241,7 @@ app.post('/api/v1/upload', multer({ dest: './uploads/' }), pgClient, function(re
 
       var zip = new AdmZip(req.files.package.path);
       var packageJson = zip.readAsText('package.json');
+      var readme = zip.readAsText('README.md');
       try {
         packageJson = JSON.parse(packageJson);
       } catch(err) {
@@ -260,7 +261,7 @@ app.post('/api/v1/upload', multer({ dest: './uploads/' }), pgClient, function(re
         on('httpUploadProgress', function(evt) { console.log(evt); }).
         send(function(err, data) {
           clientQuery(req.pgClient, 'insert into cached_project_versions (userid, projectname, version, username, readme) values ($1, $2, $3, $4, $5)',
-                  [stormpathUser.id, packageJson.name, packageJson.version, stormpathUser.username, packageJson.readme])
+                  [stormpathUser.id, packageJson.name, packageJson.version, stormpathUser.username, readme])
             .then(function(result) {
               console.log('DONE', result);
               res.send('OK');
