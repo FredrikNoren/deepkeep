@@ -189,8 +189,9 @@ var queries = {};
 app.get('/', function(req, res) {
 
   var data = {};
-  data.content = {}
+  data.content = {};
   data.content.isLoggedIn = !!req.user;
+  data.content.host = req.headers.host;
   data.logoMuted = true;
 
   renderPage('Home', data, req, res);
@@ -322,9 +323,23 @@ app.get('/:username/:project', pgClient, lookupPathUser, function(req, res, next
       });
       data.content.readme = result.rows[0].readme;
       data.content.version = result.rows[0].version;
-      data.content.downloadPath = 'https://' + S3_BUCKET + '.s3.amazonaws.com/' + req.pathUser.id + '-' + req.params.project + '-' + data.content.version + '.zip'
+      data.content.downloadPath = '/' + req.params.username + '/' + req.params.project + '/' + data.content.version + '/package.zip';
       renderPage('Project', data, req, res);
     }).catch(next);
+});
+
+app.get('/:username/:project/package.zip', pgClient, lookupPathUser, function(req, res, next) {
+  clientQuery(req.pgClient, 'select * from cached_project_versions where userid=$1 and name=$2 order by version desc limit 1',
+          [req.pathUser.id, req.params.project])
+    .then(function(result) {
+      req.pgCloseClient();
+      res.redirect('/' + req.params.username + '/' + req.params.project + '/' + result.rows[0].version + '/package.zip');
+    });
+});
+
+app.get('/:username/:project/:version/package.zip', lookupPathUser, function(req, res, next) {
+  var downloadPath = 'https://' + S3_BUCKET + '.s3.amazonaws.com/' + req.pathUser.id + '-' + req.params.project + '-' + req.params.version + '.zip';
+  res.redirect(downloadPath);
 });
 
 var port = process.env.PORT || 8080;

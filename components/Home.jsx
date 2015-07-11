@@ -10,7 +10,10 @@ marked.setOptions({
 
 var P = 'home'; // style class name prefix
 
-var buildingAndPublishingDoc = `
+class Home extends React.Component {
+  render() {
+
+    var buildingAndPublishingDoc = `
 ### Building and publishing a network
 We'll build a simple xor network as an example. Start with creating a file
 called \`train.lua\` and add this to it:
@@ -83,7 +86,7 @@ And finally we'll upload the package to deepstack:
 
 \`\`\`bash
 curl -u USERNAME -F "package=@package.0.1.zip" \\
-localhost:5000/api/v1/upload
+${this.props.host}/api/v1/upload
 \`\`\`
 
 Done!
@@ -95,10 +98,10 @@ Create a new directory, and start with downloading the trained network we
 published before:
 
 \`\`\`bash
-curl -o net localhost:8080/FredrikNoren/xor/network
+curl -LO ${this.props.host}/FredrikNoren/xor/package.zip
 \`\`\`
 
-Then create a file called "test.lua" and add the following to it:
+Then create a file called \`test.lua\` and add the following to it:
 
 \`\`\`lua
 require 'torch'
@@ -130,8 +133,6 @@ If it all goes well you should see something like
 \`\`\`
 `
 
-class Home extends React.Component {
-  render() {
     return (
 <section className={`${P}`}>
   <div className={`${P}-hero container`}>
