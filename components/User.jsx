@@ -8,7 +8,7 @@ class User extends React.Component {
     return (<section className={`${P} container`}>
       <b>Projects:</b>
       <ul>{this.props.projects.map(project => {
-        return <li><a href={project.url}>{project.name}</a></li>
+        return <li><a href={project.url}>{project.projectname}</a></li>
       })}</ul>
     </section>)
   }

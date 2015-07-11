@@ -138,6 +138,7 @@ If it all goes well you should see something like
   <div className={`${P}-hero container`}>
     <div className="logo">deep<span className="logo-stack">stack</span></div>
     <div className={`${P}-subtitle`}>The Neural Networks Repository</div>
+    <a href="/all" className={`${P}-nprojects`}>{this.props.nprojects} projects available so far</a>
   </div>
 
   <div className={`${P}-tutorial`}>
@@ -179,6 +180,10 @@ Home.styles = `
       display: block;
     }
     .${P}-subtitle {
+      display: block;
+    }
+    .${P}-nprojects {
+      margin-top: 40px;
       display: block;
     }
   }

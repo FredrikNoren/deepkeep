@@ -184,9 +184,10 @@ PartialQuery.prototype.toQuery = function(params, values) {
   return { text: sql, values: values };
 }
 var queries = {};
+queries.allProjects = new PartialQuery('select userid, projectname, username from cached_project_versions group by userid, projectname, username');
+queries.countAllProject = new PartialQuery('select count(*) as nprojects from ($[allProjects]) as allprojects', { allProjects: queries.allProjects });
 
-
-app.get('/', function(req, res) {
+app.get('/', pgClient, function(req, res, next) {
 
   var data = {};
   data.content = {};
@@ -194,7 +195,29 @@ app.get('/', function(req, res) {
   data.content.host = req.headers.host;
   data.logoMuted = true;
 
-  renderPage('Home', data, req, res);
+  clientQuery(req.pgClient, queries.countAllProject.toQuery())
+    .then(function(result) {
+      data.content.nprojects = result.rows[0].nprojects;
+      renderPage('Home', data, req, res);
+      req.pgCloseClient();
+    }).catch(next);
+});
+
+app.get('/all', pgClient, function(req, res, next) {
+
+  var data = {};
+  data.content = {};
+  data.content.isLoggedIn = !!req.user;
+
+  clientQuery(req.pgClient, queries.allProjects.toQuery())
+    .then(function(result) {
+      data.content.projects = result.rows.map(function(project) {
+        project.url = '/' + project.username + '/' + project.projectname;
+        return project;
+      });
+      renderPage('All', data, req, res);
+      req.pgCloseClient();
+    }).catch(next);
 });
 
 app.get('/favicon.ico', function(req, res) {
@@ -236,8 +259,8 @@ app.post('/api/v1/upload', multer({ dest: './uploads/' }), pgClient, function(re
       s3obj.upload({ Body: body }).
         on('httpUploadProgress', function(evt) { console.log(evt); }).
         send(function(err, data) {
-          clientQuery(req.pgClient, 'insert into cached_project_versions (userid, name, version, readme) values ($1, $2, $3, $4)',
-                  [stormpathUser.id, packageJson.name, packageJson.version, packageJson.readme])
+          clientQuery(req.pgClient, 'insert into cached_project_versions (userid, projectname, version, username, readme) values ($1, $2, $3, $4, $5)',
+                  [stormpathUser.id, packageJson.name, packageJson.version, stormpathUser.username, packageJson.readme])
             .then(function(result) {
               console.log('DONE', result);
               res.send('OK');
@@ -292,13 +315,13 @@ app.get('/:username', pgClient, lookupPathUser, function(req, res, next) {
   var data = {};
   data.content = {};
 
-  clientQuery(req.pgClient, 'select name from cached_project_versions where userid=$1 group by name',
+  clientQuery(req.pgClient, 'select projectname from cached_project_versions where userid=$1 group by projectname',
           [req.pathUser.id])
     .then(function(result) {
       req.pgCloseClient();
       console.log('Insert res', result);
       data.content.projects = result.rows.map(function(project) {
-        project.url = '/' + req.pathUser.username + '/' + project.name;
+        project.url = '/' + req.pathUser.username + '/' + project.projectname;
         return project;
       });
       renderPage('User', data, req, res);
@@ -313,7 +336,7 @@ app.get('/:username/:project', pgClient, lookupPathUser, function(req, res, next
 
   console.log('USERID', req.pathUser.id)
   console.log('PROJECT', req.params.project)
-  clientQuery(req.pgClient, 'select * from cached_project_versions where userid=$1 and name=$2 order by version desc',
+  clientQuery(req.pgClient, 'select * from cached_project_versions where userid=$1 and projectname=$2 order by version desc',
           [req.pathUser.id, req.params.project])
     .then(function(result) {
       req.pgCloseClient();
@@ -329,7 +352,7 @@ app.get('/:username/:project', pgClient, lookupPathUser, function(req, res, next
 });
 
 app.get('/:username/:project/package.zip', pgClient, lookupPathUser, function(req, res, next) {
-  clientQuery(req.pgClient, 'select * from cached_project_versions where userid=$1 and name=$2 order by version desc limit 1',
+  clientQuery(req.pgClient, 'select * from cached_project_versions where userid=$1 and projectname=$2 order by version desc limit 1',
           [req.pathUser.id, req.params.project])
     .then(function(result) {
       req.pgCloseClient();
