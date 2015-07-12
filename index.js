@@ -230,7 +230,7 @@ app.post('/api/v1/upload', multer({ dest: './uploads/' }), pgClient, function(re
       res.status(401).send(err.userMessage);
       return;
     }
-    req.app.get('stormpathApplication').getAccounts({ username: req.params.username }, function(err, accounts) {
+    req.app.get('stormpathApplication').getAccounts({ username: user.name }, function(err, accounts) {
       var stormpathUser = accounts.items[0];
       stormpathUser.id = stormpathUserHrefToId(stormpathUser.href);
 
