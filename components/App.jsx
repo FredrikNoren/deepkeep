@@ -25,7 +25,10 @@ class App extends React.Component {
           <div className="container">
             <a href="/" className={classnames({ logo: true, muted: this.props.logoMuted })}>deep<span className="logo-stack">stack</span></a>
             <div className={`${P}-search`}>
-              <input type="text" placeholder="Search" />
+              <i className="fa fa-search"></i>
+              <form action='/search' method='GET'>
+                <input type="text" placeholder="Search" name="q"/>
+              </form>
             </div>
             <div className={`${P}-profile`}>
               {profileSection}
@@ -42,6 +45,13 @@ App.styles = `
   border-bottom: 1px solid rgba(238, 238, 238, 0.09);
   margin-bottom: 20px;
   padding-bottom: 5px;
+
+  form {
+    margin-left: 10px;
+    margin-bottom: 0;
+    width: 176px;
+    display: inline-block;
+  }
 
   .logo {
     margin-right: 25px;
