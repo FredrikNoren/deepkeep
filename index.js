@@ -230,40 +230,38 @@ app.post('/api/v1/upload', multer({ dest: './uploads/' }), pgClient, function(re
       res.status(401).send(err.userMessage);
       return;
     }
-    req.app.get('stormpathApplication').getAccounts({ username: user.name }, function(err, accounts) {
-      var stormpathUser = accounts.items[0];
-      stormpathUser.id = stormpathUserHrefToId(stormpathUser.href);
+    var stormpathUser = result.account;
+    stormpathUser.id = stormpathUserHrefToId(stormpathUser.href);
 
-      var zip = new AdmZip(req.files.package.path);
-      var packageJson = zip.readAsText('package.json');
-      var readme = zip.readAsText('README.md');
-      try {
-        packageJson = JSON.parse(packageJson);
-      } catch(err) {
-        res.status(400).send('Could not parse package.json');
-        return;
+    var zip = new AdmZip(req.files.package.path);
+    var packageJson = zip.readAsText('package.json');
+    var readme = zip.readAsText('README.md');
+    try {
+      packageJson = JSON.parse(packageJson);
+    } catch(err) {
+      res.status(400).send('Could not parse package.json');
+      return;
+    }
+    console.log(packageJson);
+    var body = fs.createReadStream(req.files.package.path);
+    var s3obj = new aws.S3({
+      params: {
+        Bucket: S3_BUCKET,
+        Key: stormpathUser.id + '-' + packageJson.name + '-' + packageJson.version + '.zip',
+        ACL: 'public-read'
       }
-      console.log(packageJson);
-      var body = fs.createReadStream(req.files.package.path);
-      var s3obj = new aws.S3({
-        params: {
-          Bucket: S3_BUCKET,
-          Key: stormpathUser.id + '-' + packageJson.name + '-' + packageJson.version + '.zip',
-          ACL: 'public-read'
-        }
-      });
-      s3obj.upload({ Body: body }).
-        on('httpUploadProgress', function(evt) { console.log(evt); }).
-        send(function(err, data) {
-          clientQuery(req.pgClient, 'insert into cached_project_versions (userid, projectname, version, username, readme) values ($1, $2, $3, $4, $5)',
-                  [stormpathUser.id, packageJson.name, packageJson.version, stormpathUser.username, readme])
-            .then(function(result) {
-              console.log('DONE', result);
-              res.send('OK');
-              req.pgCloseClient();
-            }).catch(next);
-        });
     });
+    s3obj.upload({ Body: body }).
+      on('httpUploadProgress', function(evt) { console.log(evt); }).
+      send(function(err, data) {
+        clientQuery(req.pgClient, 'insert into cached_project_versions (userid, projectname, version, username, readme) values ($1, $2, $3, $4, $5)',
+                [stormpathUser.id, packageJson.name, packageJson.version, stormpathUser.username, readme])
+          .then(function(result) {
+            console.log('DONE', result);
+            res.send('OK');
+            req.pgCloseClient();
+          }).catch(next);
+      });
   });
 });
 
