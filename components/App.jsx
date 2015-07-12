@@ -16,8 +16,6 @@ class App extends React.Component {
       profileSection = <a href="/login" className="button">Login</a>
     }
     return (<div>
-        <a style={{ position: 'fixed', right: 20, bottom: 20 }} href="/reset">Reset</a>
-
         <div className={`${P}-header`}>
           <div className="container">
             <div className={`${P}-right`}>

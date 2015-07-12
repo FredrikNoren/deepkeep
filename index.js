@@ -315,6 +315,7 @@ app.get('/:username', pgClient, lookupPathUser, function(req, res, next) {
 
   var data = {};
   data.content = {};
+  data.content.username = req.params.username;
 
   clientQuery(req.pgClient, 'select projectname from cached_project_versions where userid=$1 group by projectname',
           [req.pathUser.id])
