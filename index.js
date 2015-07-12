@@ -329,7 +329,7 @@ app.get('/:username', pgClient, lookupPathUser, function(req, res, next) {
     }).catch(next);
 });
 
-app.get('/:username/:project', pgClient, lookupPathUser, function(req, res, next) {
+function renderProject(req, res, next) {
   var data = {};
   data.content = {};
   data.content.username = req.params.username;
@@ -343,14 +343,30 @@ app.get('/:username/:project', pgClient, lookupPathUser, function(req, res, next
       req.pgCloseClient();
       //console.log('Insert res', result);
       data.content.versions = result.rows.map(function(project) {
-        return project.version;
+        return {
+          name: project.version,
+          url: '/' + req.params.username + '/' + req.params.project + '/' + project.version
+        }
       });
-      data.content.readme = result.rows[0].readme;
-      data.content.version = result.rows[0].version;
-      data.content.downloadPath = '/' + req.params.username + '/' + req.params.project + '/' + data.content.version + '/package.zip';
+      if (req.params.version) {
+        var activeVersion = result.rows.filter(function(project) {
+          return project.version == req.params.version;
+        })[0];
+        if (!activeVersion) {
+          throw new Error('No such version');
+        }
+      } else {
+        var activeVersion = result.rows[0];
+      }
+      data.content.readme = activeVersion.readme;
+      data.content.version = activeVersion.version;
+      data.content.downloadPath = '/' + req.params.username + '/' + req.params.project + '/' + activeVersion.version + '/package.zip';
       renderPage('Project', data, req, res);
     }).catch(next);
-});
+}
+
+app.get('/:username/:project', pgClient, lookupPathUser, renderProject);
+app.get('/:username/:project/:version', pgClient, lookupPathUser, renderProject);
 
 app.get('/:username/:project/package.zip', pgClient, lookupPathUser, function(req, res, next) {
   clientQuery(req.pgClient, 'select * from cached_project_versions where userid=$1 and projectname=$2 order by version desc limit 1',

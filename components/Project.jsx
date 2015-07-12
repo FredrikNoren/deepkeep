@@ -44,7 +44,11 @@ class Project extends React.Component {
         <div className="two columns">
           <b>Versions</b>
           {this.props.versions.map(version => {
-            return <div>{version}</div>
+            var p = <a href={version.url}>{version.name}</a>;
+            if (this.props.version == version.name) {
+              p = <b>{p}</b>
+            }
+            return <div>{p}</div>
           })}
         </div>
       </div>
