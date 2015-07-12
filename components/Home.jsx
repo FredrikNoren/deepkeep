@@ -216,6 +216,8 @@ Home.styles = `
     .${P}-tutorial-inner {
       background: #ffffff;
       color: #222941;
+      padding-top: 50px;
+      padding-bottom: 50px;
       h4 {
         font-size: 20px;
         color: #252847;
