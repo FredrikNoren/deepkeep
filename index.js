@@ -339,11 +339,10 @@ app.post('/api/v1/upload', multer({ dest: './uploads/' }), pgClient, esClient, f
             .then(function(result) {
               console.log('DONE', result);
               req.pgCloseClient();
-              // needed so we can reconstruct a project url
-              packageJson.username = user.name;
               req.esClient.index({
                 index: 'docs',
                 type: 'doc',
+                id: user.name + '/' + packageJson.name,
                 body: packageJson
               }, function(err, response) {
                 if (err) {
