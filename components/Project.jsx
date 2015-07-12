@@ -29,7 +29,7 @@ class Project extends React.Component {
     return (<section className={`${P} container`}>
       <div className={`${P}-header`}>
         <i className="fa fa-cube"></i>
-        <a href={'/' + this.props.username} className={`${P}-username`}>{this.props.username}</a>
+        <a href={'/' + this.props.username} className={`${P}-username muted`}>{this.props.username}</a>
         /
         <a href={'/' + this.props.username + '/' + this.props.project} className={`${P}-project`}>{this.props.project}</a>
       </div>
@@ -60,12 +60,10 @@ Project.styles = `
 .${P}-header {
   font-size: 20px;
   .${P}-username {
-    color: #C8AB77;
     margin-left: 10px;
     margin-right: 10px;
   }
   .${P}-project {
-    font-weight: bold;
     margin-left: 10px;
   }
 }

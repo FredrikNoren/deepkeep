@@ -10,23 +10,22 @@ class App extends React.Component {
     if (this.props.profileName) {
       profileSection = <div>
         <a href={this.props.profileLink}>{this.props.profileName}</a>
-        <a href="/logout" className="button">Logout</a>
+        &nbsp;
+        <a href="/logout" className="muted">Logout</a>
       </div>
     } else {
-      profileSection = <a href="/login" className="button">Login</a>
+      profileSection = <a href="/login" className="muted">Login</a>
     }
     return (<div>
         <div className={`${P}-header`}>
           <div className="container">
-            <div className={`${P}-right`}>
+            <a href="/" className={classnames({ logo: true, muted: this.props.logoMuted })}>deep<span className="logo-stack">stack</span></a>
+            <div className={`${P}-search`}>
+              <input type="text" placeholder="Search" />
+            </div>
+            <div className={`${P}-profile`}>
               {profileSection}
             </div>
-            <a href="/" className={classnames({ logo: true, muted: this.props.logoMuted })}>deep<span className="logo-stack">stack</span></a>
-            <div className={`${P}-search-input`}>
-              <input type="text" placeholder="Search" />
-              <i className="fa fa-search"></i>
-            </div>
-            <span className="page-title">{this.props.pageTitle}</span>
           </div>
         </div>
         {this.props.children}
@@ -38,18 +37,32 @@ App.styles = `
 .${P}-header {
   border-bottom: 1px solid rgba(238, 238, 238, 0.09);
   margin-bottom: 20px;
+  padding-bottom: 5px;
 
   .logo {
-    position: relative;
-    top: 12px;
+    margin-right: 25px;
   }
 
-  .${P}-right {
-    float: right;
-  }
-  .${P}-search-input {
+  .${P}-search {
     display: inline-block;
-    margin-left: 22px;
+    position: relative;
+    width: 200px;
+    input {
+      width: 100%;
+      padding: 0px;
+      height: auto;
+      font-size: 17px;
+      background: transparent;
+      border: 0px;
+      border-radius: 0px;
+      color: #fff;
+    }
+  }
+  .${P}-profile {
+    display: inline-block;
+    position: absolute;
+    bottom: 4px;
+    right: 0px;
   }
 }
 `
