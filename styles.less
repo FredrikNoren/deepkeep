@@ -1,4 +1,14 @@
 
+@import (less) "./node_modules/highlight.js/styles/default.css";
+
+.invert-highlightjs {
+  @import (less) "./node_modules/highlight.js/styles/zenburn.css";
+  code {
+    background: rgba(0, 0, 0, 0.32);
+    border-color: rgba(0, 0, 0, 0.21);
+  }
+}
+
 body, html {
   margin: 0;
   padding: 0;

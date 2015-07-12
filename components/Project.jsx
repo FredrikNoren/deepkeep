@@ -32,7 +32,7 @@ class Project extends React.Component {
         <div className="nine columns">
           <div className={`${P}-readme-title`}>README</div>
 
-          <div className={`${P}-readme`}>
+          <div className={`${P}-readme invert-highlightjs`}>
             <Markdown doc={this.props.readme} />
           </div>
         </div>

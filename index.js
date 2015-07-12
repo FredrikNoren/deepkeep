@@ -107,10 +107,9 @@ function clientQuery(client, sql, params) {
     var c = require('./components/' + component);
     return c.styles || '';
   }).join('\n');
-  source += '\n' + fs.readFileSync('node_modules/highlight.js/styles/default.css');
   source += '\n' + fs.readFileSync('styles.less');
   var lessCss = '';
-  less.render(source, {}, function(error, output) {
+  less.render(source, { filename: path.resolve('./styles.less') }, function(error, output) {
     if (error) {
       fs.writeFileSync('tmp.error.less', source);
       console.log(error);
