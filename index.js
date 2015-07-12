@@ -402,7 +402,7 @@ function pgClient(req, res, next) {
 
 function esClient(req, res, next) {
   req.esClient = new elasticsearch.Client({
-    host: process.env.BONSAI_URL || '192.168.59.103:9200'
+    host: process.env.BONSAI_URL || 'localhost:9200'
   });
   next();
 }
