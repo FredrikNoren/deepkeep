@@ -4,7 +4,8 @@ var marked = require('marked');
 
 marked.setOptions({
   highlight: function (code, lang) {
-    return require('highlight.js').highlight(lang, code).value;
+    if (lang === undefined) return code;
+    else return require('highlight.js').highlight(lang, code).value;
   }
 });
 
