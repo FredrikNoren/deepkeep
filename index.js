@@ -60,11 +60,6 @@ function requestLogger(req, res, next) {
 }
 app.use(requestLogger);
 
-function ensureAuthenticated(req, res, next) {
-  if (req.isAuthenticated()) { return next(); }
-  res.redirect('/login?backUrl=' + encodeURIComponent(req.url));
-};
-
 app.get('/reset', function(req, res) {
   runSQLFile('schema.sql', function() {
     res.json({ ok: true });
@@ -286,14 +281,6 @@ function lookupPathUser(req, res, next) {
   });
 }
 
-function ensureUserOwned(req, res, next) {
-  if (!req.user || req.user.href != req.pathUser.href) {
-    res.status(401).send('Not authorized');
-  } else {
-    next();
-  }
-}
-
 function stormpathUserHrefToId(href) {
   return href.substring('https://api.stormpath.com/v1/accounts/'.length);
 }
@@ -301,8 +288,7 @@ function stormpathUserHrefToId(href) {
 function pgClient(req, res, next) {
   pg.connect(DATABASE_URL, function(err, client, closeClient) {
     if (err) {
-      console.log('Failed to connect to database', err);
-      res.status(500).send('Failed to connect to database');
+      next(err);
     } else {
       req.pgClient = client;
       req.pgCloseClient = closeClient;
