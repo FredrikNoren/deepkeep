@@ -5,6 +5,7 @@ var Html = React.createClass({
   render: function() {
     return (
       <html>
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
         <link href='http://fonts.googleapis.com/css?family=Open+Sans:700,300,800,400' rel='stylesheet' type='text/css' />
         <link href='http://fonts.googleapis.com/css?family=Quicksand:300,400,700' rel='stylesheet' type='text/css' />
         <link href="https://cdnjs.cloudflare.com/ajax/libs/skeleton/2.0.4/skeleton.css" rel="stylesheet" />
