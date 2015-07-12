@@ -1,11 +1,9 @@
 
 var React = require('react');
-var http = require('../client/http');
-var marked = require('marked');
 
-var P = 'all';
+var P = 'list';
 
-class All extends React.Component {
+class List extends React.Component {
   render() {
     return <div className="container">
       <h5>{this.props.title}</h5>
@@ -15,8 +13,8 @@ class All extends React.Component {
     </div>
   }
 }
-All.classPrefix = P;
-All.styles = `
+List.classPrefix = P;
+List.styles = `
 `
 
-module.exports = All;
+module.exports = List;

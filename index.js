@@ -267,7 +267,7 @@ app.get('/all', pgClient, function(req, res, next) {
         project.url = '/' + project.username + '/' + project.projectname;
         return project;
       });
-      renderPage('All', data, req, res);
+      renderPage('List', data, req, res);
       req.pgCloseClient();
     }).catch(next);
 });
@@ -303,7 +303,7 @@ app.get('/search', esClient, function(req, res, next) {
       project.url = '/' + project.username + '/' + project.name;
       return project;
     });
-    renderPage('All', data, req, res);
+    renderPage('List', data, req, res);
   }, function (err) {
     console.log('search failed', err);
     res.status(500).send(err);
