@@ -1,13 +1,6 @@
 
 var React = require('react');
-var marked = require('marked');
-
-marked.setOptions({
-  highlight: function (code, lang) {
-    if (lang === undefined) return code;
-    else return require('highlight.js').highlight(lang, code).value;
-  }
-});
+var Markdown = require('./Markdown.jsx');
 
 var P = 'home'; // style class name prefix
 
@@ -164,11 +157,11 @@ If it all goes well you should see something like
     <div className={`${P}-tutorial-inner`}>
       <div className="row container">
         <div className="six columns">
-          <div dangerouslySetInnerHTML={{ __html: marked(buildingAndPublishingDoc) }} />
+          <Markdown doc={buildingAndPublishingDoc} />
         </div>
 
         <div className="six columns">
-          <div dangerouslySetInnerHTML={{ __html: marked(usingDoc) }} />
+          <Markdown doc={usingDoc} />
         </div>
       </div>
     </div>

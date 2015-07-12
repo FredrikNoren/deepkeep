@@ -1,7 +1,7 @@
 
 var React = require('react');
 var http = require('../client/http');
-var marked = require('marked');
+var Markdown = require('./Markdown.jsx');
 
 var P = 'project';
 
@@ -21,7 +21,6 @@ class Project extends React.Component {
     }
   }
   render() {
-    var readmeHtml = marked(this.props.readme);
     return (<section className={`${P} container`}>
       <div className={`${P}-header`}>
         <i className="fa fa-cube"></i>
@@ -32,7 +31,10 @@ class Project extends React.Component {
       <div className="row">
         <div className="nine columns">
           <div className={`${P}-readme-title`}>README</div>
-          <div className={`${P}-readme`} dangerouslySetInnerHTML={{__html: readmeHtml }} />
+
+          <div className={`${P}-readme`}>
+            <Markdown doc={this.props.readme} />
+          </div>
         </div>
         <div className="three columns">
           <div className={`${P}-sidebar-item`}>
