@@ -259,6 +259,7 @@ app.get('/all', pgClient, function(req, res, next) {
   var data = {};
   data.content = {};
   data.content.isLoggedIn = !!req.user;
+  data.content.title = 'All Projects';
 
   clientQuery(req.pgClient, queries.allProjects.toQuery())
     .then(function(result) {
@@ -271,11 +272,7 @@ app.get('/all', pgClient, function(req, res, next) {
     }).catch(next);
 });
 
-app.get('/favicon.ico', function(req, res) {
-  res.status(404).send('Not found');
-});
-
-app.get('/api/v1/search', esClient, function(req, res, next) {
+app.get('/search', esClient, function(req, res, next) {
   // TODO falcon: pagination
   req.esClient.search({
     index: 'docs',
@@ -288,17 +285,34 @@ app.get('/api/v1/search', esClient, function(req, res, next) {
         }
       }
     }
-  }).then(function (resp) {
-    var hits = resp.hits.hits.map(function(h) { return h._source; });
-    return res.json({
-      total: resp.hits.total,
-      hits: hits
+  }).then(function (result) {
+    var data = {};
+    data.content = {};
+    data.content.isLoggedIn = !!req.user;
+
+    var total = result.hits.total;
+    data.content.title = [
+      total,
+      (total === 1 ? 'result' : 'results'),
+      'matching',
+      req.query.q
+    ].join(' ');
+    data.content.projects = result.hits.hits.map(function(hit) {
+      var project = hit._source;
+      project.projectname = project.name;
+      project.url = '/' + project.username + '/' + project.name;
+      return project;
     });
+    renderPage('All', data, req, res);
   }, function (err) {
     console.log('search failed', err);
     res.status(500).send(err);
     return;
   });
+});
+
+app.get('/favicon.ico', function(req, res) {
+  res.status(404).send('Not found');
 });
 
 app.post('/api/v1/upload', multer({ dest: './uploads/' }), pgClient, esClient, function(req, res, next) {
@@ -339,6 +353,8 @@ app.post('/api/v1/upload', multer({ dest: './uploads/' }), pgClient, esClient, f
             .then(function(result) {
               console.log('DONE', result);
               req.pgCloseClient();
+              // add the username for consistency
+              packageJson.username = user.name;
               req.esClient.index({
                 index: 'docs',
                 type: 'doc',
