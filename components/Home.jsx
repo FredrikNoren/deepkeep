@@ -71,7 +71,7 @@ model. Create a file called \`package.json\` and add the following to it:
 
 Let's also create a \`README.md\` file:
 
-\`\`\`md
+\`\`\`markdown
 # xor
 
 This package provides a network that can compute xor.
