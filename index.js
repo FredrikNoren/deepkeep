@@ -339,9 +339,6 @@ app.post('/api/v1/upload', multer({ dest: './uploads/' }), pgClient, esClient, f
             .then(function(result) {
               console.log('DONE', result);
               req.pgCloseClient();
-<<<<<<< HEAD
-            });
-=======
               // needed so we can reconstruct a project url
               packageJson.username = user.name;
               req.esClient.index({
@@ -355,9 +352,8 @@ app.post('/api/v1/upload', multer({ dest: './uploads/' }), pgClient, esClient, f
                   console.log('failed to index package.json', err);
                 }
                 res.send('OK');
-              })
-            }).catch(next);
->>>>>>> wip
+              });
+            });
         });
     }).catch(next);
   });
