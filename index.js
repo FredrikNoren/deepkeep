@@ -244,24 +244,31 @@ app.post('/api/v1/upload', multer({ dest: './uploads/' }), pgClient, function(re
     }
     console.log(packageJson);
     var body = fs.createReadStream(req.files.package.path);
-    var s3obj = new aws.S3({
-      params: {
-        Bucket: S3_BUCKET,
-        Key: stormpathUser.id + '-' + packageJson.name + '-' + packageJson.version + '.zip',
-        ACL: 'public-read'
+    var key = stormpathUser.id + '-' + packageJson.name + '-' + packageJson.version + '.zip';
+    s3.headObject({ Key: key }, function(err, headRes) {
+      if (headRes || err.code !== 'NotFound') {
+        res.status(409).send('Package already extists at version ' + packageJson.version);
+        return;
       }
-    });
-    s3obj.upload({ Body: body }).
-      on('httpUploadProgress', function(evt) { console.log(evt); }).
-      send(function(err, data) {
-        clientQuery(req.pgClient, 'insert into cached_project_versions (userid, projectname, version, username, readme) values ($1, $2, $3, $4, $5)',
-                [stormpathUser.id, packageJson.name, packageJson.version, stormpathUser.username, readme])
-          .then(function(result) {
-            console.log('DONE', result);
-            res.send('OK');
-            req.pgCloseClient();
-          }).catch(next);
+      var s3obj = new aws.S3({
+        params: {
+          Bucket: S3_BUCKET,
+          Key: key,
+          ACL: 'public-read'
+        }
       });
+      s3obj.upload({ Body: body }).
+        on('httpUploadProgress', function(evt) { console.log(evt); }).
+        send(function(err, data) {
+          clientQuery(req.pgClient, 'insert into cached_project_versions (userid, projectname, version, username, readme) values ($1, $2, $3, $4, $5)',
+                  [stormpathUser.id, packageJson.name, packageJson.version, stormpathUser.username, readme])
+            .then(function(result) {
+              console.log('DONE', result);
+              res.send('OK');
+              req.pgCloseClient();
+            }).catch(next);
+        });
+    });
   });
 });
 
