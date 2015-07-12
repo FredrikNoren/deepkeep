@@ -15,6 +15,7 @@ var aws = require('aws-sdk');
 var streamToBuffer = require('stream-to-buffer');
 var uuid = require('uuid');
 var pg = require('pg');
+var elasticsearch = require('elasticsearch');
 var React = require('react');
 require('node-jsx').install({extension: '.jsx', harmony: true });
 
@@ -274,7 +275,33 @@ app.get('/favicon.ico', function(req, res) {
   res.status(404).send('Not found');
 });
 
-app.post('/api/v1/upload', multer({ dest: './uploads/' }), pgClient, function(req, res, next) {
+app.get('/api/v1/search', esClient, function(req, res, next) {
+  // TODO falcon: pagination
+  req.esClient.search({
+    index: 'docs',
+    type: 'doc',
+    body: {
+      query: {
+        multi_match: {
+          query: req.query.q,
+          fields: ['name', 'description']
+        }
+      }
+    }
+  }).then(function (resp) {
+    var hits = resp.hits.hits.map(function(h) { return h._source; });
+    return res.json({
+      total: resp.hits.total,
+      hits: hits
+    });
+  }, function (err) {
+    console.log('search failed', err);
+    res.status(500).send(err);
+    return;
+  });
+});
+
+app.post('/api/v1/upload', multer({ dest: './uploads/' }), pgClient, esClient, function(req, res, next) {
   console.log(req.files);
   var user = auth(req);
   req.app.get('stormpathApplication').authenticateAccount({
@@ -343,6 +370,13 @@ function pgClient(req, res, next) {
       next();
     }
   });
+}
+
+function esClient(req, res, next) {
+  req.esClient = new elasticsearch.Client({
+    host: process.env.BONSAI_URL || '192.168.59.103:9200'
+  });
+  next();
 }
 
 app.get('/:username', pgClient, lookupPathUser, function(req, res, next) {
