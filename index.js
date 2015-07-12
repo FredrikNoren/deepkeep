@@ -335,6 +335,7 @@ function renderProject(req, res, next) {
   data.content = {};
   data.content.username = req.params.username;
   data.content.project = req.params.project;
+  data.content.host = req.headers.host;
 
   console.log('USERID', req.pathUser.id)
   console.log('PROJECT', req.params.project)
@@ -367,7 +368,6 @@ function renderProject(req, res, next) {
 }
 
 app.get('/:username/:project', pgClient, lookupPathUser, renderProject);
-app.get('/:username/:project/:version', pgClient, lookupPathUser, renderProject);
 
 app.get('/:username/:project/package.zip', pgClient, lookupPathUser, function(req, res, next) {
   clientQuery(req.pgClient, 'select * from cached_project_versions where userid=$1 and projectname=$2 order by version desc limit 1',
@@ -377,6 +377,8 @@ app.get('/:username/:project/package.zip', pgClient, lookupPathUser, function(re
       res.redirect('/' + req.params.username + '/' + req.params.project + '/' + result.rows[0].version + '/package.zip');
     });
 });
+
+app.get('/:username/:project/:version', pgClient, lookupPathUser, renderProject);
 
 app.get('/:username/:project/:version/package.zip', lookupPathUser, function(req, res, next) {
   var downloadPath = 'https://' + S3_BUCKET + '.s3.amazonaws.com/' + req.pathUser.id + '-' + req.params.project + '-' + req.params.version + '.zip';

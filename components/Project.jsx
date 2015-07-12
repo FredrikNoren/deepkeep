@@ -12,17 +12,13 @@ class Project extends React.Component {
       uploadState: null
     }
   }
-  fileChanged() {
-    this.setState({ uploadState: 'Uploading...' });
-    var file = React.findDOMNode(this.refs.file).files[0];
-    http.get('/' + encodeURIComponent(this.props.username) + '/' + encodeURIComponent(this.props.project) + '/newupload?file_type=' + encodeURIComponent(file.type))
-      .then(res => {
-        var headers = {};
-        headers['x-amz-acl'] = 'public-read';
-        return http.putRaw(res.signedRequest, file, { headers: headers }).then(() => {
-          this.setState({ uploadState: 'Uploaded' });
-        });
-      });
+  copyInstall() {
+    var copyTextarea = React.findDOMNode(this.refs.installInput);
+    copyTextarea.select();
+    try {
+      document.execCommand('copy');
+    } catch (err) {
+    }
   }
   render() {
     var readmeHtml = marked(this.props.readme);
@@ -34,22 +30,34 @@ class Project extends React.Component {
         <a href={'/' + this.props.username + '/' + this.props.project} className={`${P}-project`}>{this.props.project}</a>
       </div>
       <div className="row">
-        <div className="ten columns">
-          <p>
-            <a className="button" href={this.props.downloadPath}>Download model version {this.props.version}</a>
-          </p>
+        <div className="nine columns">
           <div className={`${P}-readme-title`}>README</div>
           <div className={`${P}-readme`} dangerouslySetInnerHTML={{__html: readmeHtml }} />
         </div>
-        <div className="two columns">
-          <b>Versions</b>
-          {this.props.versions.map(version => {
-            var p = <a href={version.url}>{version.name}</a>;
-            if (this.props.version == version.name) {
-              p = <b>{p}</b>
-            }
-            return <div>{p}</div>
-          })}
+        <div className="three columns">
+          <div className={`${P}-sidebar-item`}>
+            <b>Install</b>
+            <div className={`${P}-install`}>
+              <input type="text" ref="installInput" value={`curl -LO ${this.props.host}/${this.props.username}/${this.props.project}/package.zip && unzip package.zip -d ${this.props.project} && rm package.zip`} />
+              <a className={`${P}-copy`} onClick={this.copyInstall.bind(this)}>
+                <i className="fa fa-clipboard"/>
+              </a>
+            </div>
+          </div>
+          <div className={`${P}-sidebar-item`}>
+            <b>Versions</b>
+            {this.props.versions.map(version => {
+              var p = <a href={version.url}>{version.name}</a>;
+              if (this.props.version == version.name) {
+                p = <b>{p}</b>
+              }
+              return <div>{p}</div>
+            })}
+          </div>
+          <div className={`${P}-sidebar-item`}>
+            <b>Download</b>
+            <div><a href={this.props.downloadPath}><i className="fa fa-download"/> Download version {this.props.version}</a></div>
+          </div>
         </div>
       </div>
     </section>)
@@ -59,12 +67,35 @@ Project.classPrefix = P;
 Project.styles = `
 .${P}-header {
   font-size: 20px;
+  margin-bottom: 22px;
   .${P}-username {
     margin-left: 10px;
     margin-right: 10px;
   }
   .${P}-project {
     margin-left: 10px;
+  }
+}
+.${P}-sidebar-item {
+  margin-bottom: 10px;
+}
+.${P}-install {
+  background: rgba(0, 0, 0, 0.17);
+  position: relative;
+  input {
+    height: auto;
+    width: 100%;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 0;
+    color: #eee;
+    font-family: monospace;
+    padding-right: 29px;
+  }
+  .${P}-copy {
+    position: absolute;
+    right: 7px;
+    top: 6px;
   }
 }
 .${P}-readme-title {
