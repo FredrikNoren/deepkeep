@@ -11,10 +11,14 @@ class App extends React.Component {
       profileSection = <div>
         <a href={this.props.profileLink}>{this.props.profileName}</a>
         &nbsp;
-        <a href="/logout" className="muted">Logout</a>
+        <a href="/logout" className="muted">Log out</a>
       </div>
     } else {
-      profileSection = <a href="/login" className="muted">Login</a>
+      profileSection = <div>
+        <a href="/register" className="muted">Sign up</a>
+        &nbsp;-&nbsp;
+        <a href="/login" className="muted">Log in</a>
+      </div>
     }
     return (<div>
         <div className={`${P}-header`}>
