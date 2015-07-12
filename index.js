@@ -338,9 +338,26 @@ app.post('/api/v1/upload', multer({ dest: './uploads/' }), pgClient, esClient, f
                   [stormpathUser.id, packageJson.name, packageJson.version, stormpathUser.username, readme])
             .then(function(result) {
               console.log('DONE', result);
-              res.send('OK');
               req.pgCloseClient();
+<<<<<<< HEAD
             });
+=======
+              // needed so we can reconstruct a project url
+              packageJson.username = user.name;
+              req.esClient.index({
+                index: 'docs',
+                type: 'doc',
+                body: packageJson
+              }, function(err, response) {
+                if (err) {
+                  // don't let this fail the request. we can run reindex jobs
+                  // nightly or something along those lines.
+                  console.log('failed to index package.json', err);
+                }
+                res.send('OK');
+              })
+            }).catch(next);
+>>>>>>> wip
         });
     }).catch(next);
   });
