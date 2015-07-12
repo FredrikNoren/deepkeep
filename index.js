@@ -182,6 +182,62 @@ var queries = {};
 queries.allProjects = new PartialQuery('select userid, projectname, username from cached_project_versions group by userid, projectname, username');
 queries.countAllProject = new PartialQuery('select count(*) as nprojects from ($[allProjects]) as allprojects', { allProjects: queries.allProjects });
 
+function FSStorage(app) {
+  if (!fs.existsSync('storage')) fs.mkdirSync('storage');
+  app.use('/storage', express.static('storage'));
+}
+FSStorage.prototype.exists = function(key) {
+  return Promise.resolve(fs.existsSync(path.join('storage', key)));
+}
+FSStorage.prototype.upload = function(key, stream) {
+  return new Promise(function(resolve, reject) {
+    var f = fs.createWriteStream(path.join('storage', key));
+    stream.pipe(f).on('close', function() {
+      resolve();
+    });
+  });
+}
+FSStorage.prototype.urlForKey = function(key) {
+  return '/storage/' + encodeURIComponent(key);
+}
+function S3Storage() {
+  var AWS_ACCESS_KEY = process.env.AWS_ACCESS_KEY;
+  var AWS_SECRET_KEY = process.env.AWS_SECRET_KEY;
+  this.S3_BUCKET = process.env.S3_BUCKET;
+  aws.config.update({ accessKeyId: AWS_ACCESS_KEY, secretAccessKey: AWS_SECRET_KEY });
+  this.s3 = new aws.S3({ params: { Bucket: this.S3_BUCKET }});
+}
+S3Storage.prototype.exists = function(key) {
+  return new Promise(function(resolve, reject) {
+    this.s3.headObject({ Key: key }, function(err, headRes) {
+      resolve(headRes || err.code !== 'NotFound');
+    });
+  }.bind(this));
+}
+S3Storage.prototype.upload = function(key, stream) {
+  return new Promise(function(resolve, reject) {
+    var s3obj = new aws.S3({
+      params: {
+        Bucket: this.S3_BUCKET,
+        Key: key,
+        ACL: 'public-read'
+      }
+    });
+    s3obj.upload({ Body: stream }).
+      on('httpUploadProgress', function(evt) { console.log(evt); }).
+      send(function(err, data) {
+        if (err) reject(err);
+        else resolve(data);
+      });
+  }.bind(this));
+}
+S3Storage.prototype.urlForKey = function(key) {
+  return 'https://' + this.S3_BUCKET + '.s3.amazonaws.com/' + encodeURIComponent(key);
+}
+var storage;
+if (process.env.AWS_ACCESS_KEY) storage = new S3Storage();
+else storage = new FSStorage(app);
+
 app.get('/', pgClient, function(req, res, next) {
 
   var data = {};
@@ -245,38 +301,26 @@ app.post('/api/v1/upload', multer({ dest: './uploads/' }), pgClient, function(re
     console.log(packageJson);
     var body = fs.createReadStream(req.files.package.path);
     var key = stormpathUser.id + '-' + packageJson.name + '-' + packageJson.version + '.zip';
-    s3.headObject({ Key: key }, function(err, headRes) {
-      if (headRes || err.code !== 'NotFound') {
+    storage.exists(key).then(function(exists) {
+      if (exists) {
         res.status(409).send('Package already extists at version ' + packageJson.version);
         return;
       }
-      var s3obj = new aws.S3({
-        params: {
-          Bucket: S3_BUCKET,
-          Key: key,
-          ACL: 'public-read'
-        }
-      });
-      s3obj.upload({ Body: body }).
-        on('httpUploadProgress', function(evt) { console.log(evt); }).
-        send(function(err, data) {
-          clientQuery(req.pgClient, 'insert into cached_project_versions (userid, projectname, version, username, readme) values ($1, $2, $3, $4, $5)',
+      return storage.upload(key, body)
+        .then(function() {
+          return clientQuery(req.pgClient, 'insert into cached_project_versions (userid, projectname, version, username, readme) values ($1, $2, $3, $4, $5)',
                   [stormpathUser.id, packageJson.name, packageJson.version, stormpathUser.username, readme])
             .then(function(result) {
               console.log('DONE', result);
               res.send('OK');
               req.pgCloseClient();
-            }).catch(next);
+            });
         });
-    });
+    }).catch(next);
   });
 });
 
-var AWS_ACCESS_KEY = process.env.AWS_ACCESS_KEY;
-var AWS_SECRET_KEY = process.env.AWS_SECRET_KEY;
-var S3_BUCKET = process.env.S3_BUCKET;
-aws.config.update({ accessKeyId: AWS_ACCESS_KEY, secretAccessKey: AWS_SECRET_KEY });
-var s3 = new aws.S3({ params: { Bucket: S3_BUCKET }});
+
 
 function lookupPathUser(req, res, next) {
   req.app.get('stormpathApplication').getAccounts({ username: req.params.username }, function(err, accounts) {
@@ -372,8 +416,8 @@ app.get('/:username/:project/package.zip', pgClient, lookupPathUser, function(re
 app.get('/:username/:project/:version', pgClient, lookupPathUser, renderProject);
 
 app.get('/:username/:project/:version/package.zip', lookupPathUser, function(req, res, next) {
-  var downloadPath = 'https://' + S3_BUCKET + '.s3.amazonaws.com/' + req.pathUser.id + '-' + req.params.project + '-' + req.params.version + '.zip';
-  res.redirect(downloadPath);
+  var key = req.pathUser.id + '-' + req.params.project + '-' + req.params.version + '.zip';
+  res.redirect(storage.urlForKey(key));
 });
 
 var port = process.env.PORT || 8080;
