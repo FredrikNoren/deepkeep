@@ -30,10 +30,12 @@ class Project extends React.Component {
       </div>
       <div className="row">
         <div className="nine columns">
-          <div className={`${P}-readme-title`}>README</div>
+          <div className={`${P}-readme`}>
+            <div className={`${P}-readme-title`}>README</div>
 
-          <div className={`${P}-readme invert-highlightjs`}>
-            <Markdown doc={this.props.readme} />
+            <div className={`${P}-readme-content invert-highlightjs`}>
+              <Markdown doc={this.props.readme} />
+            </div>
           </div>
         </div>
         <div className="three columns">
@@ -100,22 +102,25 @@ Project.styles = `
     top: 6px;
   }
 }
-.${P}-readme-title {
-  background: rgba(0, 0, 0, 0.08);
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.18);
-  padding: 5px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-bottom: 0px;
-  border-top-left-radius: 5px;
-  border-top-right-radius: 5px;
-}
 .${P}-readme {
-  background: rgba(0, 0, 0, 0.06);
-  padding: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  border-bottom-left-radius: 5px;
-  border-bottom-right-radius: 5px;
+  margin-bottom: 30px;
+  .${P}-readme-title {
+    background: rgba(0, 0, 0, 0.08);
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.18);
+    padding: 5px;
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-bottom: 0px;
+    border-top-left-radius: 5px;
+    border-top-right-radius: 5px;
+  }
+  .${P}-readme-content {
+    background: rgba(0, 0, 0, 0.06);
+    padding: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-bottom-left-radius: 5px;
+    border-bottom-right-radius: 5px;
+  }
 }
 `
 
