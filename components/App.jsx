@@ -23,7 +23,7 @@ class App extends React.Component {
     return (<div>
         <div className={`${P}-header`}>
           <div className="container">
-            <a href="/" className={classnames({ logo: true, muted: this.props.logoMuted })}>deep<span className="logo-stack">stack</span></a>
+            <a href="/" className={classnames({ logo: true, muted: this.props.logoMuted })}>deep<span className="logo-stack">keep</span></a>
             <div className={`${P}-search`}>
               <i className="fa fa-search"></i>
               <form action='/search' method='GET'>

@@ -87,7 +87,7 @@ Next we package the three files up together:
 zip package.1.0.zip package.json README.md trained-network.t7
 \`\`\`
 
-And finally we'll upload the package to deepstack:
+And finally we'll upload the package to deepkeep:
 
 \`\`\`bash
 curl -u USERNAME -F "package=@package.1.0.zip" \\
@@ -143,7 +143,7 @@ If it all goes well you should see something like
     return (
 <section className={`${P}`}>
   <div className={`${P}-hero container`}>
-    <div className="logo">deep<span className="logo-stack">stack</span></div>
+    <div className="logo">deep<span className="logo-stack">keep</span></div>
     <div className={`${P}-subtitle`}>The Neural Networks Repository</div>
     <a href="/all" className={`${P}-nprojects`}>{this.props.nprojects} projects available so far</a>
   </div>
