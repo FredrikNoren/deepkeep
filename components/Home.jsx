@@ -9,8 +9,9 @@ class Home extends React.Component {
 
     var buildingAndPublishingDoc = `
 ### Building and publishing a network
-We'll build a simple xor network as an example. Start with creating a file
-called \`train.lua\` and add this to it:
+We'll build and publish a simple xor network as an example, using
+[torch](http://torch.ch). Start with creating a file called \`train.lua\` and
+add this to it:
 
 \`\`\`lua
 require 'torch'
@@ -155,13 +156,29 @@ If it all goes well you should see something like
     </svg>
 
     <div className={`${P}-tutorial-inner`}>
-      <div className="row container">
-        <div className="six columns">
-          <Markdown doc={buildingAndPublishingDoc} />
+      <div className="container">
+        <div className="row">
+          <div className="six columns">
+            <Markdown doc={buildingAndPublishingDoc} />
+          </div>
+
+          <div className="six columns">
+            <Markdown doc={usingDoc} />
+          </div>
         </div>
 
-        <div className="six columns">
-          <Markdown doc={usingDoc} />
+        <div className={`${P}-about`}>
+          <h3>Meet the devs</h3>
+          <div className={`${P}-faces`}>
+            <div>
+              <img src="/static/noren.jpg" />
+              <a href="http://github.com/FredrikNoren">Noren</a>
+            </div>
+            <div>
+              <img src="/static/falcon.jpeg" />
+              <a href="http://twitter.com/chedkid">Falcon</a>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -224,12 +241,25 @@ Home.styles = `
     }
   }
 }
-
-pre.shell {
-  background: #343434;
-  padding: 10px;
-  color: #E2E2E2;
-  margin: 0px;
+.${P}-about {
+  max-width: 500px;
+  margin-left: auto;
+  margin-right: auto;
+  .${P}-faces {
+    display: flex;
+    justify-content: space-around;
+    margin-bottom: 37px;
+    margin-top: 45px;
+    & > div {
+      text-align: center;
+    }
+    img {
+      display: block;
+      width: 150px;
+      height: 150px;
+      border-radius: 100%;
+    }
+  }
 }
 `
 

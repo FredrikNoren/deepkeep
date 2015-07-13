@@ -61,6 +61,8 @@ function requestLogger(req, res, next) {
 }
 app.use(requestLogger);
 
+app.use('/static', express.static('static'));
+
 app.get('/reset', function(req, res) {
   runSQLFile('schema.sql', function() {
     res.json({ ok: true });
