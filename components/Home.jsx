@@ -170,7 +170,7 @@ If it all goes well you should see something like
         </div>
 
         <div className={`${P}-about`}>
-          <h3>Meet the devs</h3>
+          <h3>Developing DeepKeep</h3>
           <div className={`${P}-faces`}>
             <div>
               <img src="/static/noren.jpg" />
@@ -248,6 +248,7 @@ Home.styles = `
   max-width: 500px;
   margin-left: auto;
   margin-right: auto;
+  text-align: center;
   .${P}-faces {
     display: flex;
     justify-content: space-around;
