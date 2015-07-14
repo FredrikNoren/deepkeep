@@ -315,8 +315,7 @@ app.get('/search', esClient, function(req, res, next) {
     renderPage('List', data, req, res);
   }, function (err) {
     console.log('search failed', err);
-    res.status(500).send(err);
-    return;
+    renderPage('Error', {content: {message: 'Search failed.'}}, req, res);
   });
 });
 
@@ -472,8 +471,8 @@ function renderProject(req, res, next) {
       data.content.version = activeVersion.version;
       data.content.downloadPath = '/' + req.params.username + '/' + req.params.project + '/' + activeVersion.version + '/package.zip';
       renderPage('Project', data, req, res);
-    }).catch(function(err) {
-      return renderPage('Error', {content: {message: 'Unknown project.'}}, req, res);
+    }).catch(function() {
+      renderPage('Error', {content: {message: 'Unknown project.'}}, req, res);
     });
 }
 
@@ -485,6 +484,8 @@ app.get('/:username/:project/package.zip', pgClient, lookupPathUser, function(re
     .then(function(result) {
       req.pgCloseClient();
       res.redirect('/' + req.params.username + '/' + req.params.project + '/' + result.rows[0].version + '/package.zip');
+    }).catch(function() {
+      renderPage('Error', {content: {message: 'Unknown project.'}}, req, res);
     });
 });
 
