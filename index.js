@@ -321,7 +321,7 @@ app.get('/search', esClient, function(req, res, next) {
 });
 
 app.get('/favicon.ico', function(req, res) {
-  res.status(404).send('Not found');
+  res.sendfile('static/favicon.ico');
 });
 
 app.post('/api/v1/upload', multer({ dest: './uploads/' }), pgClient, esClient, function(req, res, next) {
