@@ -387,6 +387,9 @@ app.post('/api/v1/upload', multer({ dest: './uploads/' }), pgClient, esClient, f
 
 function lookupPathUser(req, res, next) {
   req.app.get('stormpathApplication').getAccounts({ username: req.params.username }, function(err, accounts) {
+    if (err || !accounts || accounts.size == 0) {
+      return renderPage('Error', {content: {message: 'Unknown user.'}}, req, res);
+    }
     req.pathUser = accounts.items[0];
     req.pathUser.id = stormpathUserHrefToId(req.pathUser.href);
     next();
@@ -469,7 +472,9 @@ function renderProject(req, res, next) {
       data.content.version = activeVersion.version;
       data.content.downloadPath = '/' + req.params.username + '/' + req.params.project + '/' + activeVersion.version + '/package.zip';
       renderPage('Project', data, req, res);
-    }).catch(next);
+    }).catch(function(err) {
+      return renderPage('Error', {content: {message: 'Unknown project.'}}, req, res);
+    });
 }
 
 app.get('/:username/:project', pgClient, lookupPathUser, renderProject);
