@@ -2,10 +2,18 @@
 var React = require('react');
 var marked = require('marked');
 
+var hljs = require('highlight.js/lib/highlight.js');
+
+hljs.registerLanguage('bash', require('highlight.js/lib/languages/bash'));
+hljs.registerLanguage('javascript', require('highlight.js/lib/languages/javascript'));
+hljs.registerLanguage('json', require('highlight.js/lib/languages/json'));
+hljs.registerLanguage('lua', require('highlight.js/lib/languages/lua'));
+hljs.registerLanguage('markdown', require('highlight.js/lib/languages/markdown'));
+
 marked.setOptions({
   highlight: function (code, lang) {
     if (lang === undefined) return code;
-    else return require('highlight.js').highlight(lang, code).value;
+    else return hljs.highlight(lang, code).value;
   }
 });
 

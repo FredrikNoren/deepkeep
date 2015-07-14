@@ -8,8 +8,10 @@ var merge = require('merge');
 var stormpath = require('express-stormpath');
 var multer  = require('multer')
 var less = require('less');
+var UglifyJS = require('uglify-js');
 var AdmZip = require('adm-zip');
 var browserify = require('browserify');
+var compression = require('compression');
 var auth = require('basic-auth');
 var aws = require('aws-sdk');
 var streamToBuffer = require('stream-to-buffer');
@@ -96,10 +98,15 @@ function clientQuery(client, sql, params) {
     }
     bundle = buffer.toString();
     console.log('Bundle created');
+    if (!process.env.DEVELOP) {
+      var result = UglifyJS.minify(bundle, {fromString: true});
+      console.log('Bundle minified');
+      bundle = result.code;
+    }
     console.log("\007");
   });
 
-  app.get('/bundle.js', function(req, res) {
+  app.get('/bundle.js', compression(), function(req, res) {
     res.setHeader('Content-Type', 'application/javascript');
     res.send(bundle);
   });
