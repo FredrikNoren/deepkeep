@@ -11,8 +11,8 @@ var Html = React.createClass({
           <link href='http://fonts.googleapis.com/css?family=Quicksand:300,400,700' rel='stylesheet' type='text/css' />
           <link href="https://cdnjs.cloudflare.com/ajax/libs/skeleton/2.0.4/skeleton.css" rel="stylesheet" />
           <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css" />
-          <link rel="icon" type="image/png" href="static/favicon-32x32.png" sizes="32x32" />
-          <link rel="icon" type="image/png" href="static/favicon-16x16.png" sizes="16x16" />
+          <link rel="icon" type="image/png" href="/static/favicon-32x32.png" sizes="32x32" />
+          <link rel="icon" type="image/png" href="/static/favicon-16x16.png" sizes="16x16" />
           <link href="/bundle.css" rel="stylesheet" />
           <title>deepkeep</title>
         </head>
