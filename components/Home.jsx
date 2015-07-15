@@ -26,10 +26,10 @@ local net = nn.gModule({ node_x }, { node_y })
 -- Then some trainging data that we will use to train
 -- this model
 local trainingData = {
-{ x = torch.Tensor({ 0, 0 }), y = torch.Tensor({1}) },
-{ x = torch.Tensor({ 0, 1 }), y = torch.Tensor({0}) },
-{ x = torch.Tensor({ 1, 0 }), y = torch.Tensor({0}) },
-{ x = torch.Tensor({ 1, 1 }), y = torch.Tensor({1}) },
+{ x = torch.Tensor({ 0, 0 }), y = torch.Tensor({0}) },
+{ x = torch.Tensor({ 0, 1 }), y = torch.Tensor({1}) },
+{ x = torch.Tensor({ 1, 0 }), y = torch.Tensor({1}) },
+{ x = torch.Tensor({ 1, 1 }), y = torch.Tensor({0}) },
 }
 local criterion = nn.MSECriterion()
 
@@ -134,10 +134,10 @@ th test.lua
 If it all goes well you should see something like
 
 \`\`\`bash
-0 XOR 0 = 0.96583262167758
-0 XOR 1 = 0.03089587853588
-1 XOR 0 = 0.034721669536198
-1 XOR 1 = 0.98168738186416
+0 XOR 0 = 0.022044937504424
+0 XOR 1 = 0.97297107607815
+1 XOR 0 = 0.97108330450396
+1 XOR 1 = 0.038300505836698
 \`\`\`
 `
 
