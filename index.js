@@ -260,8 +260,9 @@ else storage = new FSStorage(app);
 function persistlog(pgClient, data) {
   data.timestamp = Date.now();
   console.log('Persistent logging', data);
-  return clientQuery(pgClient, 'insert into logs (timestamp, data) values ($1, $2)',
-          [new Date(data.timestamp), data]);
+  clientQuery(pgClient, 'insert into logs (timestamp, data) values ($1, $2)',
+    [new Date(data.timestamp), data])
+    .catch(printError);
 }
 
 app.use(function createRequestId(req, res, next) {
@@ -333,7 +334,9 @@ app.post('/api/v1/upload', pgClient, multer({ dest: './uploads/' }), function(re
                   type: 'upload-success',
                   requestId: req.requestId,
                   loggedInUserHref: stormpathUser.href,
+                  loggedInUserId: stormpathUser.id,
                   loggedInUsername: stormpathUser.username,
+                  uploadFileKey: key,
                   packageJson: packageJson
                 });
               });
@@ -353,10 +356,6 @@ app.use(function persistlogMiddleware(req, res, next) {
     requestId: req.requestId,
     loggedInUserHref: req.user ? req.user.href : null,
     loggedInUsername: req.user ? req.user.username : null
-  }).catch(function(err) {
-    console.log('Failed to log: ', err);
-    console.log(err.stack);
-    process.exit();
   });
   next();
 });
@@ -568,3 +567,8 @@ var port = process.env.PORT || 8080;
 app.listen(port, function() {
   console.log("Listening on " + port);
 });
+
+function printError(err) {
+  console.log('Promise failed', err);
+  console.log(err.stack);
+}
