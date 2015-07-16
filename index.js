@@ -7,6 +7,7 @@ var moment = require('moment');
 var merge = require('merge');
 var stormpath = require('express-stormpath');
 var multer  = require('multer')
+var EventEmitter = require('events').EventEmitter;
 var less = require('less');
 var UglifyJS = require('uglify-js');
 var AdmZip = require('adm-zip');
@@ -219,6 +220,9 @@ FSStorage.prototype.upload = function(key, stream) {
 FSStorage.prototype.urlForKey = function(key) {
   return '/storage/' + encodeURIComponent(key);
 }
+FSStorage.prototype.get = function(key) {
+  return Promise.resolve(fs.readFileSync(path.join('storage', key)));
+}
 function S3Storage() {
   var AWS_ACCESS_KEY = process.env.AWS_ACCESS_KEY;
   var AWS_SECRET_KEY = process.env.AWS_SECRET_KEY;
@@ -253,17 +257,71 @@ S3Storage.prototype.upload = function(key, stream) {
 S3Storage.prototype.urlForKey = function(key) {
   return 'https://' + this.S3_BUCKET + '.s3.amazonaws.com/' + encodeURIComponent(key);
 }
+S3Storage.prototype.get = function(key) {
+  return new Promise(function(resolve, reject) {
+    streamToBuffer(this.s3.getObject({
+      Bucket: this.S3_BUCKET,
+      Key: key
+    }).createReadStream(), function(err, result) {
+      if (err) reject(err);
+      else resolve(result);
+    });
+  }.bind(this));
+}
+
 var storage;
 if (process.env.AWS_ACCESS_KEY) storage = new S3Storage();
 else storage = new FSStorage(app);
 
+var plogEvent = new EventEmitter();
+
 function persistlog(pgClient, data) {
   data.timestamp = Date.now();
   console.log('Persistent logging', data);
-  clientQuery(pgClient, 'insert into logs (timestamp, data) values ($1, $2)',
-    [new Date(data.timestamp), data])
-    .catch(printError);
+  return clientQuery(pgClient, 'insert into logs (timestamp, data) values ($1, $2)',
+    [new Date(data.timestamp), data]).then(function() {
+      plogEvent.emit(data.type, data);
+    }).catch(printError);
 }
+
+plogEvent.on('upload-success', function uploadUpdatePGCache(log) {
+  console.log('RUNNING uploadUpdatePGCache');
+  storage.get(log.uploadFileKey)
+    .then(function(uploadFile) {
+      var package = parsePackageFile(uploadFile);
+      pg.connect(DATABASE_URL, function(err, client, closeClient) {
+        clientQuery(client, 'insert into cached_project_versions (userid, projectname, version, username, readme) values ($1, $2, $3, $4, $5)',
+              [log.loggedInUserId, package.packageJson.name, package.packageJson.version, log.loggedInUsername, package.readme])
+              .then(function() { closeClient(); })
+              .catch(function(err) {
+                closeClient();
+                printError(err);
+              });
+      });
+    }).catch(printError);
+});
+
+plogEvent.on('upload-success', function uploadUpdateES(log) {
+  console.log('RUNNING uploadUpdateES');
+  storage.get(log.uploadFileKey)
+    .then(function(uploadFile) {
+      var package = parsePackageFile(uploadFile);
+      // add the username for consistency
+      package.packageJson.username = log.loggedInUsername;
+      esClient.index({
+        index: 'docs',
+        type: 'doc',
+        id: log.loggedInUsername + '/' + package.packageJson.name,
+        body: package.packageJson
+      }, function(err, response) {
+        if (err) {
+          // don't let this fail the request. we can run reindex jobs
+          // nightly or something along those lines.
+          console.log('failed to index package.json', err);
+        }
+      });
+    }).catch(printError);
+});
 
 app.use(function createRequestId(req, res, next) {
   req.requestId = uuid.v1();
@@ -273,6 +331,18 @@ app.use(function createRequestId(req, res, next) {
 app.get('/favicon.ico', function(req, res) {
   res.sendfile('static/favicon.ico');
 });
+
+
+function parsePackageFile(content) {
+  var zip = new AdmZip(content);
+  var packageJson = zip.readAsText('package.json');
+  var readme = zip.readAsText('README.md');
+  var packageJson = JSON.parse(packageJson);
+  return {
+    packageJson: packageJson,
+    readme: readme
+  };
+}
 
 app.post('/api/v1/upload', pgClient, multer({ dest: './uploads/' }), function(req, res, next) {
   console.log(req.files);
@@ -292,55 +362,28 @@ app.post('/api/v1/upload', pgClient, multer({ dest: './uploads/' }), function(re
     var stormpathUser = result.account;
     stormpathUser.id = stormpathUserHrefToId(stormpathUser.href);
 
-    var zip = new AdmZip(req.files.package.path);
-    var packageJson = zip.readAsText('package.json');
-    var readme = zip.readAsText('README.md');
-    try {
-      packageJson = JSON.parse(packageJson);
-    } catch(err) {
-      res.status(400).send('Could not parse package.json');
-      return;
-    }
-    console.log(packageJson);
+    var package = parsePackageFile(req.files.package.path);
+
     var body = fs.createReadStream(req.files.package.path);
-    var key = stormpathUser.id + '-' + packageJson.name + '-' + packageJson.version + '.zip';
+    var key = stormpathUser.id + '-' + package.packageJson.name + '-' + package.packageJson.version + '.zip';
     storage.exists(key).then(function(exists) {
       if (exists) {
-        res.status(409).send('Package already extists at version ' + packageJson.version);
+        res.status(409).send('Package already extists at version ' + package.packageJson.version);
         return;
       }
       return storage.upload(key, body)
         .then(function() {
-          return clientQuery(req.pgClient, 'insert into cached_project_versions (userid, projectname, version, username, readme) values ($1, $2, $3, $4, $5)',
-                  [stormpathUser.id, packageJson.name, packageJson.version, stormpathUser.username, readme])
-            .then(function(result) {
-              console.log('DONE', result);
-              req.pgCloseClient();
-              // add the username for consistency
-              packageJson.username = user.name;
-              esClient.index({
-                index: 'docs',
-                type: 'doc',
-                id: user.name + '/' + packageJson.name,
-                body: packageJson
-              }, function(err, response) {
-                if (err) {
-                  // don't let this fail the request. we can run reindex jobs
-                  // nightly or something along those lines.
-                  console.log('failed to index package.json', err);
-                }
-                res.send('OK');
-                persistlog(req.pgClient, {
-                  type: 'upload-success',
-                  requestId: req.requestId,
-                  loggedInUserHref: stormpathUser.href,
-                  loggedInUserId: stormpathUser.id,
-                  loggedInUsername: stormpathUser.username,
-                  uploadFileKey: key,
-                  packageJson: packageJson
-                });
-              });
-            });
+          req.pgCloseClient();
+
+          res.send('OK');
+          persistlog(req.pgClient, {
+            type: 'upload-success',
+            requestId: req.requestId,
+            loggedInUserHref: stormpathUser.href,
+            loggedInUserId: stormpathUser.id,
+            loggedInUsername: stormpathUser.username,
+            uploadFileKey: key
+          });
         });
     }).catch(next);
   });
