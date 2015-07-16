@@ -72,6 +72,7 @@ app.get('/reset', function(req, res) {
 });
 
 function clientQuery(client, sql, params) {
+  if (!client) throw new Error('client must be specified');
   return new Promise(function(resolve, reject) {
     var handler = function(err, result) {
       if (err) reject(err);
@@ -144,7 +145,8 @@ fs.readdirSync('components').map(function(component) {
 function safeStringify(obj) {
   return JSON.stringify(obj).replace(/<\/script/g, '<\\/script').replace(/<!--/g, '<\\!--')
 }
-function renderPage(component, data, req, res) {
+function renderPage(req, res) {
+  var data = req.renderData;
   if (req.user) {
     data.profileName = req.user.username;
     data.profileLink = '/' + req.user.username;
@@ -155,14 +157,18 @@ function renderPage(component, data, req, res) {
       script: "var APP_DATA = " + safeStringify(data) + ";\n" +
         "var React = require('react');\n" +
         "var App = React.createFactory(require('App'));\n" +
-        "var InnerComponent = React.createFactory(require('" + component + "'));\n" +
+        "var InnerComponent = React.createFactory(require('" + data.component + "'));\n" +
         "React.render(App(APP_DATA, InnerComponent(APP_DATA.content)), document.getElementById('main'))\n",
       html: React.renderToString(
         components.App(data,
-          components[component](data.content)
+          components[data.component](data.content)
         )
       )
     })));
+  if (req.pgCloseClient) {
+    req.pgCloseClient();
+    req.pgCloseClient = null;
+  }
 }
 
 function PartialQuery(sql, params) {
@@ -247,84 +253,28 @@ var storage;
 if (process.env.AWS_ACCESS_KEY) storage = new S3Storage();
 else storage = new FSStorage(app);
 
-app.get('/', pgClient, function(req, res, next) {
+function persistlog(pgClient, data) {
+  data.timestamp = Date.now();
+  console.log('Persistent logging', data);
+  return clientQuery(pgClient, 'insert into logs (timestamp, data) values ($1, $2)',
+          [new Date(data.timestamp), data]);
+}
 
-  var data = {};
-  data.content = {};
-  data.content.isLoggedIn = !!req.user;
-  data.content.host = req.headers.host;
-  data.logoMuted = true;
-
-  clientQuery(req.pgClient, queries.countAllProject.toQuery())
-    .then(function(result) {
-      data.content.nprojects = result.rows[0].nprojects;
-      renderPage('Home', data, req, res);
-      req.pgCloseClient();
-    }).catch(next);
-});
-
-app.get('/all', pgClient, function(req, res, next) {
-
-  var data = {};
-  data.content = {};
-  data.content.isLoggedIn = !!req.user;
-  data.content.title = 'All Projects';
-
-  clientQuery(req.pgClient, queries.allProjects.toQuery())
-    .then(function(result) {
-      data.content.projects = result.rows.map(function(project) {
-        project.url = '/' + project.username + '/' + project.projectname;
-        return project;
-      });
-      renderPage('List', data, req, res);
-      req.pgCloseClient();
-    }).catch(next);
-});
-
-app.get('/search', esClient, function(req, res, next) {
-  // TODO falcon: pagination
-  req.esClient.search({
-    index: 'docs',
-    type: 'doc',
-    body: {
-      query: {
-        multi_match: {
-          query: req.query.q,
-          fields: ['name', 'description']
-        }
-      }
-    }
-  }).then(function (result) {
-    var data = {};
-    data.content = {};
-    data.content.isLoggedIn = !!req.user;
-
-    var total = result.hits.total;
-    data.content.title = [
-      total,
-      (total === 1 ? 'result' : 'results'),
-      'matching',
-      req.query.q
-    ].join(' ');
-    data.content.projects = result.hits.hits.map(function(hit) {
-      var project = hit._source;
-      project.projectname = project.name;
-      project.url = '/' + project.username + '/' + project.name;
-      return project;
-    });
-    renderPage('List', data, req, res);
-  }, function (err) {
-    console.log('search failed', err);
-    renderPage('Error', {content: {message: 'Search failed.'}}, req, res);
-  });
+app.use(function createRequestId(req, res, next) {
+  req.requestId = uuid.v1();
+  next();
 });
 
 app.get('/favicon.ico', function(req, res) {
   res.sendfile('static/favicon.ico');
 });
 
-app.post('/api/v1/upload', multer({ dest: './uploads/' }), pgClient, esClient, function(req, res, next) {
+app.post('/api/v1/upload', pgClient, multer({ dest: './uploads/' }), esClient, function(req, res, next) {
   console.log(req.files);
+  persistlog(req.pgClient, {
+    type: 'upload-attempt',
+    requestId: req.requestId
+  });
   var user = auth(req);
   req.app.get('stormpathApplication').authenticateAccount({
     username: user.name,
@@ -375,6 +325,13 @@ app.post('/api/v1/upload', multer({ dest: './uploads/' }), pgClient, esClient, f
                   console.log('failed to index package.json', err);
                 }
                 res.send('OK');
+                persistlog(req.pgClient, {
+                  type: 'upload-success',
+                  requestId: req.requestId,
+                  loggedInUserHref: stormpathUser.href,
+                  loggedInUsername: stormpathUser.username,
+                  packageJson: packageJson
+                });
               });
             });
         });
@@ -382,7 +339,96 @@ app.post('/api/v1/upload', multer({ dest: './uploads/' }), pgClient, esClient, f
   });
 });
 
+// ---- PAGES -----
+app.use(pgClient);
+app.use(function persistlogMiddleware(req, res, next) {
+  persistlog(req.pgClient, {
+    event: 'page-requested',
+    path: req.path,
+    method: req.method,
+    requestId: req.requestId,
+    loggedInUserHref: req.user ? req.user.href : null,
+    loggedInUsername: req.user ? req.user.username : null
+  }).catch(function(err) {
+    console.log('Failed to log: ', err);
+    console.log(err.stack);
+    process.exit();
+  });
+  next();
+});
 
+app.get('/', function(req, res, next) {
+
+  var data = req.renderData = {};
+  data.component = 'Home';
+  data.content = {};
+  data.content.isLoggedIn = !!req.user;
+  data.content.host = req.headers.host;
+  data.logoMuted = true;
+
+  clientQuery(req.pgClient, queries.countAllProject.toQuery())
+    .then(function(result) {
+      data.content.nprojects = result.rows[0].nprojects;
+      next();
+    }).catch(next);
+}, renderPage);
+
+app.get('/all', function(req, res, next) {
+
+  var data = req.renderData = {};
+  data.component = 'List';
+  data.content = {};
+  data.content.isLoggedIn = !!req.user;
+  data.content.title = 'All Projects';
+
+  clientQuery(req.pgClient, queries.allProjects.toQuery())
+    .then(function(result) {
+      data.content.projects = result.rows.map(function(project) {
+        project.url = '/' + project.username + '/' + project.projectname;
+        return project;
+      });
+      next();
+    }).catch(next);
+}, renderPage);
+
+app.get('/search', esClient, function(req, res, next) {
+  // TODO falcon: pagination
+  req.esClient.search({
+    index: 'docs',
+    type: 'doc',
+    body: {
+      query: {
+        multi_match: {
+          query: req.query.q,
+          fields: ['name', 'description']
+        }
+      }
+    }
+  }).then(function (result) {
+    var data = req.renderData = {};
+    data.component = 'List';
+    data.content = {};
+    data.content.isLoggedIn = !!req.user;
+
+    var total = result.hits.total;
+    data.content.title = [
+      total,
+      (total === 1 ? 'result' : 'results'),
+      'matching',
+      req.query.q
+    ].join(' ');
+    data.content.projects = result.hits.hits.map(function(hit) {
+      var project = hit._source;
+      project.projectname = project.name;
+      project.url = '/' + project.username + '/' + project.name;
+      return project;
+    });
+    next();
+  }, function (err) {
+    console.log('search failed', err);
+    next({ type: 'user-error', message: 'Search failed' });
+  });
+}, renderPage);
 
 function lookupPathUser(req, res, next) {
   req.app.get('stormpathApplication').getAccounts({ username: req.params.username }, function(err, accounts) {
@@ -418,9 +464,10 @@ function esClient(req, res, next) {
   next();
 }
 
-app.get('/:username', pgClient, lookupPathUser, function(req, res, next) {
+app.get('/:username', lookupPathUser, function(req, res, next) {
 
-  var data = {};
+  var data = req.renderData = {};
+  data.component = 'User';
   data.content = {};
   data.content.username = req.params.username;
 
@@ -433,12 +480,12 @@ app.get('/:username', pgClient, lookupPathUser, function(req, res, next) {
         project.url = '/' + req.pathUser.username + '/' + project.projectname;
         return project;
       });
-      renderPage('User', data, req, res);
+      next();
     }).catch(next);
-});
+}, renderPage);
 
 function renderProject(req, res, next) {
-  var data = {};
+  var data = req.renderData = {};
   data.content = {};
   data.content.username = req.params.username;
   data.content.project = req.params.project;
@@ -470,30 +517,43 @@ function renderProject(req, res, next) {
       data.content.readme = activeVersion.readme;
       data.content.version = activeVersion.version;
       data.content.downloadPath = '/' + req.params.username + '/' + req.params.project + '/' + activeVersion.version + '/package.zip';
-      renderPage('Project', data, req, res);
+      data.component = 'Project';
+      renderPage(req, res);
     }).catch(function() {
-      renderPage('Error', {content: {message: 'Unknown project.'}}, req, res);
+      next({ type: 'user-error', message: 'Unknown project.' });
     });
 }
 
-app.get('/:username/:project', pgClient, lookupPathUser, renderProject);
+app.get('/:username/:project', lookupPathUser, renderProject);
 
-app.get('/:username/:project/package.zip', pgClient, lookupPathUser, function(req, res, next) {
+app.get('/:username/:project/package.zip', lookupPathUser, function(req, res, next) {
   clientQuery(req.pgClient, 'select * from cached_project_versions where userid=$1 and projectname=$2 order by version desc limit 1',
           [req.pathUser.id, req.params.project])
     .then(function(result) {
       req.pgCloseClient();
       res.redirect('/' + req.params.username + '/' + req.params.project + '/' + result.rows[0].version + '/package.zip');
     }).catch(function() {
-      renderPage('Error', {content: {message: 'Unknown project.'}}, req, res);
+      next({ type: 'user-error', message: 'Unknown project.' });
     });
 });
 
-app.get('/:username/:project/:version', pgClient, lookupPathUser, renderProject);
+app.get('/:username/:project/:version', lookupPathUser, renderProject);
 
 app.get('/:username/:project/:version/package.zip', lookupPathUser, function(req, res, next) {
   var key = req.pathUser.id + '-' + req.params.project + '-' + req.params.version + '.zip';
   res.redirect(storage.urlForKey(key));
+});
+
+app.use(function errorHandler(err, req, res, next) {
+  if (err.type == 'user-error') {
+    req.renderData = {
+      component: 'Error',
+      content: { message: err.message },
+    }
+    renderPage(req, res);
+  } else {
+    next(err);
+  }
 });
 
 var port = process.env.PORT || 8080;
