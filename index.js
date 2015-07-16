@@ -541,7 +541,18 @@ app.get('/:username/:project/:version', lookupPathUser, renderProject);
 
 app.get('/:username/:project/:version/package.zip', lookupPathUser, function(req, res, next) {
   var key = req.pathUser.id + '-' + req.params.project + '-' + req.params.version + '.zip';
+  persistlog(req.pgClient, {
+    type: 'download-package',
+    requestId: req.requestId,
+    loggedInUserHref: req.user ? user.href : null,
+    loggedInUsername: req.user ? user.username : null,
+    packageUsername: req.pathUser.username,
+    packageUserHref: req.pathUser.href,
+    packageProject: req.params.project,
+    packageVersion: req.params.version,
+  });
   res.redirect(storage.urlForKey(key));
+  req.pgCloseClient();
 });
 
 app.use(function errorHandler(err, req, res, next) {
