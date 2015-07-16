@@ -57,6 +57,10 @@ app.use(stormpath.init(app, {
     }
 }));
 
+var esClient = new elasticsearch.Client({
+  host: process.env.BONSAI_URL || 'localhost:9200'
+});
+
 function requestLogger(req, res, next) {
   console.log(req.method + ' ' + req.url);
   next();
@@ -269,7 +273,7 @@ app.get('/favicon.ico', function(req, res) {
   res.sendfile('static/favicon.ico');
 });
 
-app.post('/api/v1/upload', pgClient, multer({ dest: './uploads/' }), esClient, function(req, res, next) {
+app.post('/api/v1/upload', pgClient, multer({ dest: './uploads/' }), function(req, res, next) {
   console.log(req.files);
   persistlog(req.pgClient, {
     type: 'upload-attempt',
@@ -313,7 +317,7 @@ app.post('/api/v1/upload', pgClient, multer({ dest: './uploads/' }), esClient, f
               req.pgCloseClient();
               // add the username for consistency
               packageJson.username = user.name;
-              req.esClient.index({
+              esClient.index({
                 index: 'docs',
                 type: 'doc',
                 id: user.name + '/' + packageJson.name,
@@ -391,9 +395,9 @@ app.get('/all', function(req, res, next) {
     }).catch(next);
 }, renderPage);
 
-app.get('/search', esClient, function(req, res, next) {
+app.get('/search', function(req, res, next) {
   // TODO falcon: pagination
-  req.esClient.search({
+  esClient.search({
     index: 'docs',
     type: 'doc',
     body: {
@@ -455,13 +459,6 @@ function pgClient(req, res, next) {
       next();
     }
   });
-}
-
-function esClient(req, res, next) {
-  req.esClient = new elasticsearch.Client({
-    host: process.env.BONSAI_URL || 'localhost:9200'
-  });
-  next();
 }
 
 app.get('/:username', lookupPathUser, function(req, res, next) {
