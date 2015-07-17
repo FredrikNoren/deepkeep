@@ -54,7 +54,18 @@ app.use(stormpath.init(app, {
     postLoginHandler: function(account, req, res, next) {
       account.id = stormpathUserHrefToId(account.href);
       next();
-    }
+    },
+    postRegistrationHandler: function(account, req, res, next) {
+      pg.connect(DATABASE_URL, function(err, client, closeClient) {
+        persistlog(client, {
+          event: 'user-registered',
+          account: account
+        }).then(function() {
+          closeClient();
+        });
+        next();
+      });
+    },
 }));
 
 var esClient = new elasticsearch.Client({
