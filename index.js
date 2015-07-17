@@ -6,7 +6,8 @@ var async = require('async');
 var moment = require('moment');
 var merge = require('merge');
 var stormpath = require('express-stormpath');
-var multer  = require('multer')
+var multer  = require('multer');
+var qs = require('querystring');
 var less = require('less');
 var UglifyJS = require('uglify-js');
 var AdmZip = require('adm-zip');
@@ -321,40 +322,75 @@ app.post('/api/v1/upload', pgClient, multer({ dest: './uploads/' }), function(re
         return;
       }
       return storage.upload(key, body)
+        .then(clientQuery(req.pgClient, 'insert into cached_project_versions (userid, projectname, version, username, readme) values ($1, $2, $3, $4, $5)',
+                [stormpathUser.id, packageJson.name, packageJson.version, stormpathUser.username, readme]))
         .then(function() {
-          return clientQuery(req.pgClient, 'insert into cached_project_versions (userid, projectname, version, username, readme) values ($1, $2, $3, $4, $5)',
-                  [stormpathUser.id, packageJson.name, packageJson.version, stormpathUser.username, readme])
-            .then(function(result) {
-              console.log('DONE', result);
-              req.pgCloseClient();
-              // add the username for consistency
-              packageJson.username = user.name;
-              esClient.index({
-                index: 'docs',
-                type: 'doc',
-                id: user.name + '/' + packageJson.name,
-                body: packageJson
-              }, function(err, response) {
-                if (err) {
-                  // don't let this fail the request. we can run reindex jobs
-                  // nightly or something along those lines.
-                  console.log('failed to index package.json', err);
-                }
-                res.send('OK');
-                persistlog(req.pgClient, {
-                  type: 'upload-success',
-                  requestId: req.requestId,
-                  loggedInUserHref: stormpathUser.href,
-                  loggedInUserId: stormpathUser.id,
-                  loggedInUsername: stormpathUser.username,
-                  uploadFileKey: key,
-                  packageJson: packageJson
+          // add the username for consistency
+          packageJson.username = user.name;
+          esClient.index({
+            index: 'docs',
+            type: 'doc',
+            id: user.name + '/' + packageJson.name,
+            body: packageJson
+          }, function(err, response) {
+            if (err) {
+              // don't let this fail the request. we can run reindex jobs
+              // nightly or something along those lines.
+              console.log('failed to index package.json', err);
+            }
+          });
+        })
+        .then(function() {
+          if (packageJson.verifiers) {
+            packageJson.verifiers.forEach(function(verifier) {
+              clientQuery(req.pgClient, 'insert into cached_project_verifications (userid, projectname, version, verificationName, status) values ($1, $2, $3, $4, $5)',
+                      [stormpathUser.id, packageJson.name, packageJson.version, verification.name, 'RUNNING'])
+                .then(function() {
+                  http.request({
+                    hostname: 'localhost',
+                    port: 8080,
+                    path: '/api/v0/dummyverify' + qs({
+                      verificationImage: verification.name,
+                      callback: req.host + '/private/api/v1/verified' + qs({
+                        userid: stormpathUser.id,
+                        projectName: packageJson.name,
+                        version: packageJson.version,
+                        verificationName: verification.name
+                      })
+                    }),
+                    method: 'POST'
+                  }, function(res) {
+                    console.log('Verify post result', res.statusCode);
+                  }).end();
                 });
-              });
             });
-        });
+          }
+        })
+        .then(function() {
+          persistlog(req.pgClient, {
+            type: 'upload-success',
+            requestId: req.requestId,
+            loggedInUserHref: stormpathUser.href,
+            loggedInUserId: stormpathUser.id,
+            loggedInUsername: stormpathUser.username,
+            uploadFileKey: key,
+            packageJson: packageJson
+          });
+        })
+        .then(function() {
+          req.pgCloseClient();
+          res.send('OK');
+        })
     }).catch(next);
   });
+});
+
+app.post('/private/api/v1/verified', pgClient, function(req, res, next) {
+  clientQuery(req.pgClient, 'update cached_project_verifications set status=$1 where userid=$2 and projectname=$3 and version=$4 and verificationName=$5',
+          [req.body.score, req.query.userid, req.query.projectName, req.query.version, req.query.verificationName])
+    .then(function() {
+      res.json({ status: 'ok' });
+    });
 });
 
 // ---- PAGES -----
