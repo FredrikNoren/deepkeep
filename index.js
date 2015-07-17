@@ -12,6 +12,7 @@ var less = require('less');
 var UglifyJS = require('uglify-js');
 var AdmZip = require('adm-zip');
 var browserify = require('browserify');
+var http = require('http');
 var compression = require('compression');
 var auth = require('basic-auth');
 var aws = require('aws-sdk');
@@ -25,6 +26,7 @@ require('node-jsx').install({extension: '.jsx', harmony: true });
 var app = express();
 
 app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.json());
 
 var DATABASE_URL = process.env.DATABASE_URL || 'postgres://localhost:5432/deepstack';
 
@@ -73,11 +75,10 @@ var esClient = new elasticsearch.Client({
   host: process.env.BONSAI_URL || 'localhost:9200'
 });
 
-function requestLogger(req, res, next) {
+app.use(function requestLogger(req, res, next) {
   console.log(req.method + ' ' + req.url);
   next();
-}
-app.use(requestLogger);
+});
 
 app.use('/static', express.static('static'));
 
@@ -341,28 +342,29 @@ app.post('/api/v1/upload', pgClient, multer({ dest: './uploads/' }), function(re
           });
         })
         .then(function() {
+          console.log('Checking for verifiers...', packageJson.verifiers)
           if (packageJson.verifiers) {
             packageJson.verifiers.forEach(function(verifier) {
               clientQuery(req.pgClient, 'insert into cached_project_verifications (userid, projectname, version, verificationName, status) values ($1, $2, $3, $4, $5)',
-                      [stormpathUser.id, packageJson.name, packageJson.version, verification.name, 'RUNNING'])
+                      [stormpathUser.id, packageJson.name, packageJson.version, verifier.name, 'RUNNING'])
                 .then(function() {
                   http.request({
                     hostname: 'localhost',
                     port: 8080,
-                    path: '/api/v0/dummyverify' + qs({
-                      verificationImage: verification.name,
-                      callback: req.host + '/private/api/v1/verified' + qs({
+                    path: '/api/v0/dummyverify?' + qs.stringify({
+                      verificationImage: verifier.name,
+                      callback: 'http://' + req.headers.host + '/private/api/v1/verified?' + qs.stringify({
                         userid: stormpathUser.id,
                         projectName: packageJson.name,
                         version: packageJson.version,
-                        verificationName: verification.name
+                        verificationName: verifier.name
                       })
                     }),
                     method: 'POST'
                   }, function(res) {
                     console.log('Verify post result', res.statusCode);
                   }).end();
-                });
+                }).catch(printError);
             });
           }
         })
@@ -386,6 +388,7 @@ app.post('/api/v1/upload', pgClient, multer({ dest: './uploads/' }), function(re
 });
 
 app.post('/private/api/v1/verified', pgClient, function(req, res, next) {
+  console.log('GOT VERIFIED', req.body);
   clientQuery(req.pgClient, 'update cached_project_verifications set status=$1 where userid=$2 and projectname=$3 and version=$4 and verificationName=$5',
           [req.body.score, req.query.userid, req.query.projectName, req.query.version, req.query.verificationName])
     .then(function() {
