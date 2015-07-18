@@ -323,6 +323,12 @@ app.post('/private/api/v1/verified', pgClient, function(req, res, next) {
     });
 });
 
+app.post('/private/api/v1/dockerevents', function(req, res, next) {
+  console.log('GOT DOCKER EVENT', req.query);
+  console.log(req.body);
+  res.send('OK');
+});
+
 // ---- PAGES -----
 app.use(pgClient);
 app.use(function persistlogMiddleware(req, res, next) {
@@ -545,7 +551,7 @@ app.use(function errorHandler(err, req, res, next) {
   }
 });
 
-var port = process.env.PORT || 8080;
+var port = process.env.PORT || 8095;
 app.listen(port, function() {
   console.log("Listening on " + port);
 });
