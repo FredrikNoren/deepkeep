@@ -459,13 +459,12 @@ app.get('/:username', lookupPathUser, function(req, res, next) {
 
 function renderProject(req, res, next) {
   var data = req.renderData = {};
+  data.component = 'Project';
   data.content = {};
   data.content.username = req.params.username;
   data.content.project = req.params.project;
   data.content.host = req.headers.host;
 
-  console.log('USERID', req.pathUser.id)
-  console.log('PROJECT', req.params.project)
   clientQuery(req.pgClient, 'select * from cached_project_versions where userid=$1 and projectname=$2 order by version desc',
           [req.pathUser.id, req.params.project])
     .then(function(result) {
@@ -490,8 +489,14 @@ function renderProject(req, res, next) {
       data.content.readme = activeVersion.readme;
       data.content.version = activeVersion.version;
       data.content.downloadPath = '/' + req.params.username + '/' + req.params.project + '/' + activeVersion.version + '/package.zip';
-      data.component = 'Project';
-      renderPage(req, res);
+
+
+      return clientQuery(req.pgClient, 'select * from cached_project_verifications where userid=$1 and projectname=$2 and version=$3',
+        [req.pathUser.id, req.params.project, data.content.version])
+        .then(function(verifications) {
+          data.content.verifications = verifications.rows;
+          renderPage(req, res);
+        });
     }).catch(function() {
       next({ type: 'user-error', message: 'Unknown project.' });
     });
