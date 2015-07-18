@@ -66,7 +66,7 @@ class Project extends React.Component {
             <b>Verified by</b>
               {this.props.verifications.map(verification => {
                 return <div className={`${P}-verified-badge`}>
-                  <a className={`${P}-verified-name`} href={verification.verificationname}>{verification.verificationname}</a>
+                  <a className={`${P}-verified-name`} href={'/' + verification.verificationname}>{verification.verificationname}</a>
                   <div className={`${P}-verified-status`}>{Math.round(verification.status*100)}%</div>
                 </div>
               })}
