@@ -1,7 +1,7 @@
 
 var aws = require('aws-sdk');
 
-module.exporst = S3Storage;
+module.exports = S3Storage;
 
 function S3Storage() {
   var AWS_ACCESS_KEY = process.env.AWS_ACCESS_KEY;
