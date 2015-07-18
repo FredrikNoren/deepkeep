@@ -4,26 +4,30 @@ var express = require('express');
 var bodyParser = require('body-parser');
 var async = require('async');
 var moment = require('moment');
-var merge = require('merge');
 var stormpath = require('express-stormpath');
-var multer  = require('multer')
+var multer  = require('multer');
+var qs = require('querystring');
 var less = require('less');
 var UglifyJS = require('uglify-js');
 var AdmZip = require('adm-zip');
 var browserify = require('browserify');
+var http = require('http');
 var compression = require('compression');
 var auth = require('basic-auth');
-var aws = require('aws-sdk');
 var streamToBuffer = require('stream-to-buffer');
 var uuid = require('uuid');
 var pg = require('pg');
 var elasticsearch = require('elasticsearch');
 var React = require('react');
 require('node-jsx').install({extension: '.jsx', harmony: true });
+var FSStorage = require('./server/fsstorage');
+var S3Storage = require('./server/s3storage');
+var PartialQuery = require('./server/partialquery');
 
 var app = express();
 
 app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.json());
 
 var DATABASE_URL = process.env.DATABASE_URL || 'postgres://localhost:5432/deepstack';
 
@@ -72,11 +76,10 @@ var esClient = new elasticsearch.Client({
   host: process.env.BONSAI_URL || 'localhost:9200'
 });
 
-function requestLogger(req, res, next) {
+app.use(function requestLogger(req, res, next) {
   console.log(req.method + ' ' + req.url);
   next();
-}
-app.use(requestLogger);
+});
 
 app.use('/static', express.static('static'));
 
@@ -186,84 +189,10 @@ function renderPage(req, res) {
   }
 }
 
-function PartialQuery(sql, params) {
-  this.sql = sql;
-  this.params = params || {};
-}
-PartialQuery.prototype.bindParams = function(params) {
-  return new PartialQuery(this.sql, merge(this.params, params));
-}
-PartialQuery.prototype.toQuery = function(params, values) {
-  if (values === undefined) values = [];
-  var localParams = merge(this.params, params);
-  var sql = this.sql.replace(/\$\[.*\]/g, function(param) {
-    param = param.substring(2, param.length - 1);
-    var p = localParams[param];
-    if (p instanceof PartialQuery) {
-      return p.toQuery(params, values).text;
-    } else {
-      values.push(p);
-      return '$' + values.length;
-    }
-  }.bind(this));
-  return { text: sql, values: values };
-}
 var queries = {};
 queries.allProjects = new PartialQuery('select userid, projectname, username from cached_project_versions group by userid, projectname, username');
 queries.countAllProject = new PartialQuery('select count(*) as nprojects from ($[allProjects]) as allprojects', { allProjects: queries.allProjects });
 
-function FSStorage(app) {
-  if (!fs.existsSync('storage')) fs.mkdirSync('storage');
-  app.use('/storage', express.static('storage'));
-}
-FSStorage.prototype.exists = function(key) {
-  return Promise.resolve(fs.existsSync(path.join('storage', key)));
-}
-FSStorage.prototype.upload = function(key, stream) {
-  return new Promise(function(resolve, reject) {
-    var f = fs.createWriteStream(path.join('storage', key));
-    stream.pipe(f).on('close', function() {
-      resolve();
-    });
-  });
-}
-FSStorage.prototype.urlForKey = function(key) {
-  return '/storage/' + encodeURIComponent(key);
-}
-function S3Storage() {
-  var AWS_ACCESS_KEY = process.env.AWS_ACCESS_KEY;
-  var AWS_SECRET_KEY = process.env.AWS_SECRET_KEY;
-  this.S3_BUCKET = process.env.S3_BUCKET;
-  aws.config.update({ accessKeyId: AWS_ACCESS_KEY, secretAccessKey: AWS_SECRET_KEY });
-  this.s3 = new aws.S3({ params: { Bucket: this.S3_BUCKET }});
-}
-S3Storage.prototype.exists = function(key) {
-  return new Promise(function(resolve, reject) {
-    this.s3.headObject({ Key: key }, function(err, headRes) {
-      resolve(headRes || err.code !== 'NotFound');
-    });
-  }.bind(this));
-}
-S3Storage.prototype.upload = function(key, stream) {
-  return new Promise(function(resolve, reject) {
-    var s3obj = new aws.S3({
-      params: {
-        Bucket: this.S3_BUCKET,
-        Key: key,
-        ACL: 'public-read'
-      }
-    });
-    s3obj.upload({ Body: stream }).
-      on('httpUploadProgress', function(evt) { console.log(evt); }).
-      send(function(err, data) {
-        if (err) reject(err);
-        else resolve(data);
-      });
-  }.bind(this));
-}
-S3Storage.prototype.urlForKey = function(key) {
-  return 'https://' + this.S3_BUCKET + '.s3.amazonaws.com/' + encodeURIComponent(key);
-}
 var storage;
 if (process.env.AWS_ACCESS_KEY) storage = new S3Storage();
 else storage = new FSStorage(app);
@@ -321,40 +250,77 @@ app.post('/api/v1/upload', pgClient, multer({ dest: './uploads/' }), function(re
         return;
       }
       return storage.upload(key, body)
+        .then(clientQuery(req.pgClient, 'insert into cached_project_versions (userid, projectname, version, username, readme) values ($1, $2, $3, $4, $5)',
+                [stormpathUser.id, packageJson.name, packageJson.version, stormpathUser.username, readme]))
         .then(function() {
-          return clientQuery(req.pgClient, 'insert into cached_project_versions (userid, projectname, version, username, readme) values ($1, $2, $3, $4, $5)',
-                  [stormpathUser.id, packageJson.name, packageJson.version, stormpathUser.username, readme])
-            .then(function(result) {
-              console.log('DONE', result);
-              req.pgCloseClient();
-              // add the username for consistency
-              packageJson.username = user.name;
-              esClient.index({
-                index: 'docs',
-                type: 'doc',
-                id: user.name + '/' + packageJson.name,
-                body: packageJson
-              }, function(err, response) {
-                if (err) {
-                  // don't let this fail the request. we can run reindex jobs
-                  // nightly or something along those lines.
-                  console.log('failed to index package.json', err);
-                }
-                res.send('OK');
-                persistlog(req.pgClient, {
-                  type: 'upload-success',
-                  requestId: req.requestId,
-                  loggedInUserHref: stormpathUser.href,
-                  loggedInUserId: stormpathUser.id,
-                  loggedInUsername: stormpathUser.username,
-                  uploadFileKey: key,
-                  packageJson: packageJson
-                });
-              });
+          // add the username for consistency
+          packageJson.username = user.name;
+          esClient.index({
+            index: 'docs',
+            type: 'doc',
+            id: user.name + '/' + packageJson.name,
+            body: packageJson
+          }, function(err, response) {
+            if (err) {
+              // don't let this fail the request. we can run reindex jobs
+              // nightly or something along those lines.
+              console.log('failed to index package.json', err);
+            }
+          });
+        })
+        .then(function() {
+          console.log('Checking for verifiers...', packageJson.verifiers)
+          if (packageJson.verifiers) {
+            packageJson.verifiers.forEach(function(verifier) {
+              clientQuery(req.pgClient, 'insert into cached_project_verifications (userid, projectname, version, verificationName, status) values ($1, $2, $3, $4, $5)',
+                      [stormpathUser.id, packageJson.name, packageJson.version, verifier.name, 'RUNNING'])
+                .then(function() {
+                  http.request({
+                    hostname: 'localhost',
+                    port: 8080,
+                    path: '/api/v0/dummyverify?' + qs.stringify({
+                      verificationImage: verifier.name,
+                      callback: 'http://' + req.headers.host + '/private/api/v1/verified?' + qs.stringify({
+                        userid: stormpathUser.id,
+                        projectName: packageJson.name,
+                        version: packageJson.version,
+                        verificationName: verifier.name
+                      })
+                    }),
+                    method: 'POST'
+                  }, function(res) {
+                    console.log('Verify post result', res.statusCode);
+                  }).end();
+                }).catch(printError);
             });
-        });
+          }
+        })
+        .then(function() {
+          persistlog(req.pgClient, {
+            type: 'upload-success',
+            requestId: req.requestId,
+            loggedInUserHref: stormpathUser.href,
+            loggedInUserId: stormpathUser.id,
+            loggedInUsername: stormpathUser.username,
+            uploadFileKey: key,
+            packageJson: packageJson
+          });
+        })
+        .then(function() {
+          req.pgCloseClient();
+          res.send('OK');
+        })
     }).catch(next);
   });
+});
+
+app.post('/private/api/v1/verified', pgClient, function(req, res, next) {
+  console.log('GOT VERIFIED', req.body);
+  clientQuery(req.pgClient, 'update cached_project_verifications set status=$1 where userid=$2 and projectname=$3 and version=$4 and verificationName=$5',
+          [req.body.score, req.query.userid, req.query.projectName, req.query.version, req.query.verificationName])
+    .then(function() {
+      res.json({ status: 'ok' });
+    });
 });
 
 // ---- PAGES -----
@@ -493,13 +459,12 @@ app.get('/:username', lookupPathUser, function(req, res, next) {
 
 function renderProject(req, res, next) {
   var data = req.renderData = {};
+  data.component = 'Project';
   data.content = {};
   data.content.username = req.params.username;
   data.content.project = req.params.project;
   data.content.host = req.headers.host;
 
-  console.log('USERID', req.pathUser.id)
-  console.log('PROJECT', req.params.project)
   clientQuery(req.pgClient, 'select * from cached_project_versions where userid=$1 and projectname=$2 order by version desc',
           [req.pathUser.id, req.params.project])
     .then(function(result) {
@@ -524,8 +489,14 @@ function renderProject(req, res, next) {
       data.content.readme = activeVersion.readme;
       data.content.version = activeVersion.version;
       data.content.downloadPath = '/' + req.params.username + '/' + req.params.project + '/' + activeVersion.version + '/package.zip';
-      data.component = 'Project';
-      renderPage(req, res);
+
+
+      return clientQuery(req.pgClient, 'select * from cached_project_verifications where userid=$1 and projectname=$2 and version=$3',
+        [req.pathUser.id, req.params.project, data.content.version])
+        .then(function(verifications) {
+          data.content.verifications = verifications.rows;
+          renderPage(req, res);
+        });
     }).catch(function() {
       next({ type: 'user-error', message: 'Unknown project.' });
     });
