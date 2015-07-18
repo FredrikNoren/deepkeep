@@ -4,7 +4,6 @@ var express = require('express');
 var bodyParser = require('body-parser');
 var async = require('async');
 var moment = require('moment');
-var merge = require('merge');
 var stormpath = require('express-stormpath');
 var multer  = require('multer');
 var qs = require('querystring');

@@ -1,4 +1,6 @@
 
+var merge = require('merge');
+
 module.exports = PartialQuery;
 
 function PartialQuery(sql, params) {
