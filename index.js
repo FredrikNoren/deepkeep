@@ -323,7 +323,7 @@ app.post('/private/api/v1/verified', pgClient, function(req, res, next) {
     });
 });
 
-app.post('/private/api/v1/dockerevents', function(req, res, next) {
+app.post('/private/api/v1/dockerevents', bodyParser.json({ type: 'application/vnd.docker.distribution.events.v1+json' }), function(req, res, next) {
   console.log('GOT DOCKER EVENT', req.query);
   console.log(req);
   res.send('OK');
