@@ -38,32 +38,58 @@ class Home extends React.Component {
 
     <div className={`${P}-tutorial-inner`}>
       <div className="container">
-        <div className="row">
-          <div className={`${P}-feature four columns`}>
-            <div className={`${P}-feature-icon`}><i className="fa fa-cloud-download"></i></div>
-            <div className={`${P}-feature-title`}>Get</div>
-            Download community supplied neural networks, trained and ready to be
-            used in your application.
+        <div className={`${P}-features`}>
+          <div className="row">
+            <div className={`${P}-feature four columns`}>
+              <div className={`${P}-feature-icon`}><i className="fa fa-cloud-download"></i></div>
+              <div className={`${P}-feature-title`}>Get</div>
+              <div><div className={`${P}-feature-online`}><i className="fa fa-check"></i> Online</div></div>
+              Download community supplied neural networks, trained and ready to be
+              used in your application.
+            </div>
+            <div className={`${P}-feature four columns`}>
+              <div className={`${P}-feature-icon`}><i className="fa fa-cubes"></i></div>
+              <div className={`${P}-feature-title`}>Host</div>
+              <div><div className={`${P}-feature-online`}><i className="fa fa-check"></i> Online</div></div>
+              Host your trained neural networks securely.
+            </div>
+            <div className={`${P}-feature four columns`}>
+              <div className={`${P}-feature-icon`}><i className="fa fa-check-circle-o"></i></div>
+              <div className={`${P}-feature-title`}>Validate</div>
+              <div><div className={`${P}-feature-online`}><i className="fa fa-check"></i> Online</div></div>
+              Validate your trained networks through community supplied
+              independent network validators.
+            </div>
           </div>
-          <div className={`${P}-feature four columns`}>
-            <div className={`${P}-feature-icon`}><i className="fa fa-cloud-upload"></i></div>
-            <div className={`${P}-feature-title`}>Host</div>
-            Host your trained neural networks securely.
-          </div>
-          <div className={`${P}-feature four columns`}>
-            <div className={`${P}-feature-icon`}><i className="fa fa-check-circle-o"></i></div>
-            <div className={`${P}-feature-title`}>Validate</div>
-            Validate your trained networks through community supplied
-            independent network validators.
+          <div className="row">
+            <div className={`${P}-feature four columns`}>
+              <div className={`${P}-feature-icon`}><i className="fa fa-exchange"></i></div>
+              <div className={`${P}-feature-title`}>Market</div>
+              <div><div className={`${P}-feature-in-progress`}><i className="fa fa-circle-o-notch"></i> In progress</div></div>
+              Buy and sell networks.
+            </div>
+            <div className={`${P}-feature four columns`}>
+              <div className={`${P}-feature-icon`}><i className="fa fa-code-fork"></i></div>
+              <div className={`${P}-feature-title`}>Extend</div>
+              <div><div className={`${P}-feature-in-progress`}><i className="fa fa-circle-o-notch"></i> In progress</div></div>
+              Build on already trained networks; train them with new datasets or
+              combine into larger networks.
+            </div>
+            <div className={`${P}-feature four columns`}>
+              <div className={`${P}-feature-icon`}><i className="fa fa-database"></i></div>
+              <div className={`${P}-feature-title`}>Datasets</div>
+              <div><div className={`${P}-feature-in-progress`}><i className="fa fa-circle-o-notch"></i> In progress</div></div>
+              Host and use large datasets.
+            </div>
           </div>
         </div>
         <div className="row">
           <div className="six columns">
-            <Markdown doc={buildingAndPublishingDoc} custom={markdownCustom} />
+            <Markdown doc={usingDoc} custom={markdownCustom} />
           </div>
 
           <div className="six columns">
-            <Markdown doc={usingDoc} custom={markdownCustom} />
+            <Markdown doc={buildingAndPublishingDoc} custom={markdownCustom} />
             <Markdown doc={validatingDoc} custom={markdownCustom} />
           </div>
         </div>
@@ -113,15 +139,34 @@ Home.styles = `
       text-align: center;
     }
   }
-  .${P}-feature {
-    text-align: center;
+  .${P}-features {
     margin-bottom: 106px;
     margin-top: 37px;
-    .${P}-feature-title {
-      font-size: 20px;
-    }
-    .${P}-feature-icon {
-      font-size: 90px;
+    .${P}-feature {
+      text-align: center;
+      margin-top: 50px;
+      margin-bottom: 50px;
+      .${P}-feature-icon {
+        font-size: 90px;
+      }
+      .${P}-feature-title {
+        font-size: 20px;
+      }
+      .${P}-feature-online, .${P}-feature-in-progress {
+        display: inline-block;
+        color: #fff;
+        padding: 3px;
+        padding-left: 10px;
+        padding-right: 10px;
+        border-radius: 20px;
+        font-size: 12px;
+      }
+      .${P}-feature-online {
+        background: #85dd83;
+      }
+      .${P}-feature-in-progress {
+        background: #C8C8C8;
+      }
     }
   }
   .${P}-getting-started {
