@@ -110,7 +110,7 @@ class Home extends React.Component {
     <svg width="1" height="1" style={{ width: '100%', height: 10}} preserveAspectRatio="none" viewBox="0 0 1 1">
       <path d="M0 0 L1 0 L1 1 Z" fill="#ffffff" />
     </svg>
-    
+
     <div className={`${P}-about`}>
       <h3>Developing deepkeep</h3>
       <div className={`${P}-faces`}>
@@ -221,6 +221,7 @@ Home.styles = `
   margin-left: auto;
   margin-right: auto;
   text-align: center;
+  margin-top: 76px;
   .${P}-faces {
     display: flex;
     justify-content: space-around;
