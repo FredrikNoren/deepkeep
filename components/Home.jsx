@@ -127,11 +127,17 @@ Home.styles = `
     margin-bottom: 56px;
     margin-top: 57px;
     .logo {
-      font-size: 60px;
+      font-size: 80px;
       display: block;
+      @media (max-width: 500px) {
+        & {
+          font-size: 65px;
+        }
+      }
     }
     .${P}-subtitle {
       display: block;
+      font-size: 20px;
     }
     .${P}-nprojects {
       margin-top: 40px;
