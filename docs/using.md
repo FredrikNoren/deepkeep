@@ -1,9 +1,9 @@
-### Using a published network
-Create a new directory, and start with downloading and extracting the trained network we
-published before:
+### Using a network
+We'll use a packaged [torch](http://torch.ch) network that computes xor as an
+example. Start by downloading and extracting the network:
 
 ```bash
-curl -LO [[[host]]]/FredrikNoren/xor/package.zip
+curl -LO [[[host]]]/deepkeep/xor/package.zip
 unzip package.zip -d xor
 rm package.zip
 ```
@@ -12,16 +12,14 @@ Then create a file called `test.lua` and add the following to it:
 
 ```lua
 require 'torch'
-require 'nn'
 require 'nngraph'
 
-local T = torch.Tensor
 local net = torch.load('xor/trained-network.t7')
 
-print('0 XOR 0 = ' .. net:forward(T({ 0, 0 }))[1])
-print('0 XOR 1 = ' .. net:forward(T({ 0, 1 }))[1])
-print('1 XOR 0 = ' .. net:forward(T({ 1, 0 }))[1])
-print('1 XOR 1 = ' .. net:forward(T({ 1, 1 }))[1])
+print('0 XOR 0 = ' .. net:forward(torch.Tensor({ 0, 0 }))[1])
+print('0 XOR 1 = ' .. net:forward(torch.Tensor({ 0, 1 }))[1])
+print('1 XOR 0 = ' .. net:forward(torch.Tensor({ 1, 0 }))[1])
+print('1 XOR 1 = ' .. net:forward(torch.Tensor({ 1, 1 }))[1])
 ```
 
 And finally run the program with
