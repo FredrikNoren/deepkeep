@@ -19,7 +19,13 @@ marked.setOptions({
 
 class Markdown extends React.Component {
   render() {
-    return <div dangerouslySetInnerHTML={{ __html: marked(this.props.doc, { sanitize: true }) }} />
+    var html =  marked(this.props.doc, { sanitize: true });
+    if (this.props.custom) {
+      Object.keys(this.props.custom).forEach(key => {
+        html = html.replace('[[[' + key + ']]]', this.props.custom[key]);
+      });
+    }
+    return <div dangerouslySetInnerHTML={{ __html: html }} />
   }
 }
 

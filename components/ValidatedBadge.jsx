@@ -19,6 +19,7 @@ ValidatedBadge.styles = `
   background: rgba(0, 0, 0, 0.05);
   border-radius: 5px;
   margin-top: 12px;
+  max-width: 200px;
   .${P}-name {
     color: #A3A3A3;
     display: block;
@@ -26,6 +27,7 @@ ValidatedBadge.styles = `
     border-top-left-radius: 5px;
     border-top-right-radius: 5px;
     padding: 5px;
+    text-align: center;
   }
   .${P}-score {
     font-size: 27px;

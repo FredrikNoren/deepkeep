@@ -2,6 +2,7 @@
 var React = require('react');
 var Markdown = require('./Markdown.jsx');
 var fs = require('fs');
+var ValidatedBadge = require('./ValidatedBadge.jsx');
 
 var P = 'home'; // style class name prefix
 
@@ -12,7 +13,12 @@ var validatingDoc = fs.readFileSync('docs/validating.md', 'utf8');
 class Home extends React.Component {
   render() {
 
-    var markdown = (doc) => doc.replace('[[[host]]]', this.props.host);
+    var badgeHtml = React.renderToStaticMarkup(<center><ValidatedBadge name="deepkeep/xor-validate" link="/deepkeep/xor-validate" score="0.97" /></center>);
+
+    var markdownCustom = {
+      host: this.props.host,
+      'validated-badge': badgeHtml
+    }
 
     return (
 <section className={`${P}`}>
@@ -34,12 +40,12 @@ class Home extends React.Component {
       <div className="container">
         <div className="row">
           <div className="six columns">
-            <Markdown doc={markdown(buildingAndPublishingDoc)} />
+            <Markdown doc={buildingAndPublishingDoc} custom={markdownCustom} />
           </div>
 
           <div className="six columns">
-            <Markdown doc={markdown(usingDoc)} />
-            <Markdown doc={markdown(validatingDoc)} />
+            <Markdown doc={usingDoc} custom={markdownCustom} />
+            <Markdown doc={validatingDoc} custom={markdownCustom} />
           </div>
         </div>
 
