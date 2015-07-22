@@ -51,7 +51,7 @@ class Home extends React.Component {
               <div className={`${P}-feature-icon`}><i className="fa fa-cubes"></i></div>
               <div className={`${P}-feature-title`}>Host</div>
               <div><div className={`${P}-feature-online`}><i className="fa fa-check"></i> Online</div></div>
-              Host your trained neural networks securely.
+              Package up and host your trained neural networks securely.
             </div>
             <div className={`${P}-feature four columns`}>
               <div className={`${P}-feature-icon`}><i className="fa fa-check-circle-o"></i></div>
