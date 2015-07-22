@@ -58,22 +58,22 @@ class Home extends React.Component {
               <div className={`${P}-feature-title`}>Validate</div>
               <div><div className={`${P}-feature-online`}><i className="fa fa-check"></i> Online</div></div>
               Validate your trained networks through community supplied
-              independent network validators.
+              independent validators.
             </div>
           </div>
           <div className="row">
             <div className={`${P}-feature four columns`}>
               <div className={`${P}-feature-icon`}><i className="fa fa-exchange"></i></div>
-              <div className={`${P}-feature-title`}>Market</div>
+              <div className={`${P}-feature-title`}>Marketplace</div>
               <div><div className={`${P}-feature-in-progress`}><i className="fa fa-circle-o-notch"></i> In progress</div></div>
-              Buy and sell networks.
+              Buy and sell trained networks.
             </div>
             <div className={`${P}-feature four columns`}>
               <div className={`${P}-feature-icon`}><i className="fa fa-code-fork"></i></div>
               <div className={`${P}-feature-title`}>Extend</div>
               <div><div className={`${P}-feature-in-progress`}><i className="fa fa-circle-o-notch"></i> In progress</div></div>
-              Build on already trained networks; train them with new datasets or
-              combine into larger networks.
+              Start off your training on a pre-trained network, or combine
+              several trained networks for better performance.
             </div>
             <div className={`${P}-feature four columns`}>
               <div className={`${P}-feature-icon`}><i className="fa fa-database"></i></div>
