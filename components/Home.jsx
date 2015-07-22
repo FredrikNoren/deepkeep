@@ -6,7 +6,7 @@ var ValidatedBadge = require('./ValidatedBadge.jsx');
 
 var P = 'home'; // style class name prefix
 
-var buildingAndPublishingDoc = fs.readFileSync('docs/building_and_publishing.md', 'utf8');
+var uploadingDoc = fs.readFileSync('docs/uploading.md', 'utf8');
 var usingDoc = fs.readFileSync('docs/using.md', 'utf8');
 var validatingDoc = fs.readFileSync('docs/validating.md', 'utf8');
 
@@ -17,7 +17,10 @@ class Home extends React.Component {
 
     var markdownCustom = {
       host: this.props.host,
-      'validated-badge': badgeHtml
+      'validated-badge': badgeHtml,
+      'icon-get': '<i class="fa fa-cloud-download"></i>',
+      'icon-host': '<i class="fa fa-cubes"></i>',
+      'icon-validate': '<i class="fa fa-check-circle-o"></i>',
     }
 
     return (
@@ -89,8 +92,15 @@ class Home extends React.Component {
           </div>
 
           <div className="six columns">
-            <Markdown doc={buildingAndPublishingDoc} custom={markdownCustom} />
+            <Markdown doc={uploadingDoc} custom={markdownCustom} />
+          </div>
+        </div>
+        <div className="row">
+          <div className="six columns">
             <Markdown doc={validatingDoc} custom={markdownCustom} />
+          </div>
+
+          <div className="six columns">
           </div>
         </div>
 
