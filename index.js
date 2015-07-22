@@ -500,8 +500,8 @@ function renderProject(req, res, next) {
 
       return clientQuery(req.pgClient, 'select * from cached_project_verifications where userid=$1 and projectname=$2 and version=$3',
         [req.pathUser.id, req.params.project, data.content.version])
-        .then(function(verifications) {
-          data.content.verifications = verifications.rows;
+        .then(function(validations) {
+          data.content.validations = validations.rows;
           renderPage(req, res);
         });
     }).catch(function() {

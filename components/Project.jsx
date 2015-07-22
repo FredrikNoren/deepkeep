@@ -2,6 +2,7 @@
 var React = require('react');
 var http = require('../client/http');
 var Markdown = require('./Markdown.jsx');
+var ValidatedBadge = require('./ValidatedBadge.jsx');
 
 var P = 'project';
 
@@ -63,12 +64,11 @@ class Project extends React.Component {
             <div><a href={this.props.downloadPath}><i className="fa fa-download"/> Download version {this.props.version}</a></div>
           </div>
           <div className={`${P}-sidebar-item`}>
-            <b>Verified by</b>
-              {this.props.verifications.map(verification => {
-                return <div className={`${P}-verified-badge`}>
-                  <a className={`${P}-verified-name`} href={'/' + verification.verificationname}>{verification.verificationname}</a>
-                  <div className={`${P}-verified-status`}>{Math.round(verification.status*100)}%</div>
-                </div>
+            <b>Validated by</b>
+              {this.props.validations.map(validation => {
+                return <ValidatedBadge name={validation.verificationname}
+                  link={'/' + validation.verificationname}
+                  score={validation.status} />
               })}
           </div>
         </div>
@@ -78,29 +78,6 @@ class Project extends React.Component {
 }
 Project.classPrefix = P;
 Project.styles = `
-.${P}-verified-badge {
-  border: 1px solid rgba(0, 0, 0, 0.19);
-  margin-bottom: 21px;
-  background: rgba(0, 0, 0, 0.05);
-  border-radius: 5px;
-  margin-top: 12px;
-  .${P}-verified-name {
-    color: #A3A3A3;
-    display: block;
-    background: rgba(0, 0, 0, 0.07);
-    border-top-left-radius: 5px;
-    border-top-right-radius: 5px;
-    padding: 5px;
-  }
-  .${P}-verified-status {
-    font-size: 27px;
-    font-family: 'Quicksand';
-    letter-spacing: 4px;
-    color: #fff;
-    text-align: center;
-    padding: 9px;
-  }
-}
 .${P}-header {
   font-size: 20px;
   margin-bottom: 22px;

@@ -7,6 +7,7 @@ var P = 'home'; // style class name prefix
 
 var buildingAndPublishingDoc = fs.readFileSync('docs/building_and_publishing.md', 'utf8');
 var usingDoc = fs.readFileSync('docs/using.md', 'utf8');
+var validatingDoc = fs.readFileSync('docs/validating.md', 'utf8');
 
 class Home extends React.Component {
   render() {
@@ -38,6 +39,7 @@ class Home extends React.Component {
 
           <div className="six columns">
             <Markdown doc={markdown(usingDoc)} />
+            <Markdown doc={markdown(validatingDoc)} />
           </div>
         </div>
 
