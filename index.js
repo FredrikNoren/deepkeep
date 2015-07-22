@@ -270,6 +270,11 @@ app.post('/api/v1/upload', pgClient, multer({ dest: './uploads/' }), function(re
           });
         })
         .then(function() {
+          packageJson.verifiers = [{
+            name: 'xor-validate',
+            url: 'github.com/deepkeep/xor-validate.git'
+          }];
+
           console.log('Checking for verifiers...', packageJson.verifiers)
           if (packageJson.verifiers) {
             packageJson.verifiers.forEach(function(verifier) {
@@ -279,8 +284,9 @@ app.post('/api/v1/upload', pgClient, multer({ dest: './uploads/' }), function(re
                   http.request({
                     hostname: 'localhost',
                     port: 8080,
-                    path: '/api/v0/dummyverify?' + qs.stringify({
-                      verificationImage: verifier.name,
+                    path: '/api/v0/verify?' + qs.stringify({
+                      verifier: verifier.url,
+                      project: 'http://www.deepkeep.co/FredrikNoren/xor/package.zip',
                       callback: 'http://' + req.headers.host + '/private/api/v1/verified?' + qs.stringify({
                         userid: stormpathUser.id,
                         projectName: packageJson.name,
