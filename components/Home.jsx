@@ -104,25 +104,26 @@ class Home extends React.Component {
           </div>
         </div>
 
-        <div className={`${P}-about`}>
-          <h3>Developing DeepKeep</h3>
-          <div className={`${P}-faces`}>
-            <div>
-              <img src="/static/noren.jpg" />
-              <a href="http://github.com/FredrikNoren">Noren</a>
-            </div>
-            <div>
-              <img src="/static/falcon.jpeg" />
-              <a href="http://twitter.com/chedkid">Falcon</a>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
 
     <svg width="1" height="1" style={{ width: '100%', height: 10}} preserveAspectRatio="none" viewBox="0 0 1 1">
       <path d="M0 0 L1 0 L1 1 Z" fill="#ffffff" />
     </svg>
+    
+    <div className={`${P}-about`}>
+      <h3>Developing deepkeep</h3>
+      <div className={`${P}-faces`}>
+        <div>
+          <img src="/static/noren.jpg" />
+          <a href="http://github.com/FredrikNoren">Noren</a>
+        </div>
+        <div>
+          <img src="/static/falcon.jpeg" />
+          <a href="http://twitter.com/chedkid">Falcon</a>
+        </div>
+      </div>
+    </div>
 
   </div>
 
