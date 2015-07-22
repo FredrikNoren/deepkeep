@@ -39,6 +39,25 @@ class Home extends React.Component {
     <div className={`${P}-tutorial-inner`}>
       <div className="container">
         <div className="row">
+          <div className={`${P}-feature four columns`}>
+            <div className={`${P}-feature-icon`}><i className="fa fa-cloud-download"></i></div>
+            <div className={`${P}-feature-title`}>Get</div>
+            Download community supplied neural networks, trained and ready to be
+            used in your application.
+          </div>
+          <div className={`${P}-feature four columns`}>
+            <div className={`${P}-feature-icon`}><i className="fa fa-cloud-upload"></i></div>
+            <div className={`${P}-feature-title`}>Host</div>
+            Host your trained neural networks securely.
+          </div>
+          <div className={`${P}-feature four columns`}>
+            <div className={`${P}-feature-icon`}><i className="fa fa-check-circle-o"></i></div>
+            <div className={`${P}-feature-title`}>Validate</div>
+            Validate your trained networks through community supplied
+            independent network validators.
+          </div>
+        </div>
+        <div className="row">
           <div className="six columns">
             <Markdown doc={buildingAndPublishingDoc} custom={markdownCustom} />
           </div>
@@ -92,6 +111,17 @@ Home.styles = `
       margin-top: 40px;
       display: block;
       text-align: center;
+    }
+  }
+  .${P}-feature {
+    text-align: center;
+    margin-bottom: 106px;
+    margin-top: 37px;
+    .${P}-feature-title {
+      font-size: 20px;
+    }
+    .${P}-feature-icon {
+      font-size: 90px;
     }
   }
   .${P}-getting-started {
