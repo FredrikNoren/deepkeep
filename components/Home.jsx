@@ -1,145 +1,17 @@
 
 var React = require('react');
 var Markdown = require('./Markdown.jsx');
+var fs = require('fs');
 
 var P = 'home'; // style class name prefix
+
+var buildingAndPublishingDoc = fs.readFileSync('docs/building_and_publishing.md', 'utf8');
+var usingDoc = fs.readFileSync('docs/using.md', 'utf8');
 
 class Home extends React.Component {
   render() {
 
-    var buildingAndPublishingDoc = `
-### Building and publishing a network
-We'll build and publish a simple xor network as an example, using
-[torch](http://torch.ch). Start with creating a file called \`train.lua\` and
-add this to it:
-
-\`\`\`lua
-require 'torch'
-require 'nn'
-require 'nngraph'
-
--- First let's define our network
-local node_x = nn.Linear(2, 3)()
-local node_y = nn.Linear(3, 1)(nn.Tanh()(node_x))
-local net = nn.gModule({ node_x }, { node_y })
-
--- Then some trainging data that we will use to train
--- this model
-local trainingData = {
-{ x = torch.Tensor({ 0, 0 }), y = torch.Tensor({0}) },
-{ x = torch.Tensor({ 0, 1 }), y = torch.Tensor({1}) },
-{ x = torch.Tensor({ 1, 0 }), y = torch.Tensor({1}) },
-{ x = torch.Tensor({ 1, 1 }), y = torch.Tensor({0}) },
-}
-local criterion = nn.MSECriterion()
-
--- Ok, let's train it!
-local err = 1
-while err > 0.001 do
-err = 0
-for i, d in pairs(trainingData) do
-err = err + criterion:forward(net:forward(d.x), d.y)
-net:zeroGradParameters()
-net:backward(input,
-criterion:backward(net.output, d.y))
-net:updateParameters(0.01)
-end
-err = err / #trainingData
-print("Training... Current network error: " .. err)
-end
-
--- And finally, we save it to disk
-torch.save('trained-network.t7', net)
-\`\`\`
-
-Run it with
-
-\`\`\`bash
-th train.lua
-\`\`\`
-
-This will produce a file called \`trained-network.t7\`. Next we create a
-file called package.json, which contains information about this trained
-model. Create a file called \`package.json\` and add the following to it:
-
-\`\`\`json
-{
-"name": "xor",
-"version": "1.0",
-"model": "trained-network.t7"
-}
-\`\`\`
-
-Let's also create a \`README.md\` file:
-
-\`\`\`markdown
-# xor
-
-This package provides a network that can compute xor.
-
-## Usage
-
-__Add usage instructions here__
-\`\`\`
-
-Next we package the three files up together:
-
-\`\`\`bash
-zip package.1.0.zip package.json README.md trained-network.t7
-\`\`\`
-
-And finally we'll upload the package to deepkeep:
-
-\`\`\`bash
-curl -u USERNAME -F "package=@package.1.0.zip" \\
-${this.props.host}/api/v1/upload
-\`\`\`
-
-Done!
-`
-
-var usingDoc = `
-### Using a published network
-Create a new directory, and start with downloading and extracting the trained network we
-published before:
-
-\`\`\`bash
-curl -LO ${this.props.host}/FredrikNoren/xor/package.zip
-unzip package.zip -d xor
-rm package.zip
-\`\`\`
-
-Then create a file called \`test.lua\` and add the following to it:
-
-\`\`\`lua
-require 'torch'
-require 'nn'
-require 'nngraph'
-
-local T = torch.Tensor
-local net = torch.load('xor/trained-network.t7')
-
-print('0 XOR 0 = ' .. net:forward(T({ 0, 0 }))[1])
-print('0 XOR 1 = ' .. net:forward(T({ 0, 1 }))[1])
-print('1 XOR 0 = ' .. net:forward(T({ 1, 0 }))[1])
-print('1 XOR 1 = ' .. net:forward(T({ 1, 1 }))[1])
-\`\`\`
-
-And finally run the program with
-
-\`\`\`bash
-th test.lua
-\`\`\`
-
-If it all goes well you should see something like
-
-\`\`\`bash
-0 XOR 0 = 0.022044937504424
-0 XOR 1 = 0.97297107607815
-1 XOR 0 = 0.97108330450396
-1 XOR 1 = 0.038300505836698
-\`\`\`
-`
+    var markdown = (doc) => doc.replace('[[[host]]]', this.props.host);
 
     return (
 <section className={`${P}`}>
@@ -161,11 +33,11 @@ If it all goes well you should see something like
       <div className="container">
         <div className="row">
           <div className="six columns">
-            <Markdown doc={buildingAndPublishingDoc} />
+            <Markdown doc={markdown(buildingAndPublishingDoc)} />
           </div>
 
           <div className="six columns">
-            <Markdown doc={usingDoc} />
+            <Markdown doc={markdown(usingDoc)} />
           </div>
         </div>
 

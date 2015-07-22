@@ -109,6 +109,7 @@ function clientQuery(client, sql, params) {
   });
   b.require('react');
   b.transform('reactify', { es6: true });
+  b.transform('brfs');
   var bundle = 'throw new Error("Bundle not ready yet!")';
   streamToBuffer(b.bundle(), function(err, buffer) {
     if (err) {
