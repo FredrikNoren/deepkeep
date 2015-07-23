@@ -13,7 +13,7 @@ var validatingDoc = fs.readFileSync('docs/validating.md', 'utf8');
 class Home extends React.Component {
   render() {
 
-    var badgeHtml = React.renderToStaticMarkup(<center><ValidatedBadge name="deepkeep/xor-validate" link="/deepkeep/xor-validate" score="0.97" /></center>);
+    var badgeHtml = React.renderToStaticMarkup(<center><ValidatedBadge name="deepkeep/xor-validate" link="/deepkeep/xor-validate" score={0.65} /></center>);
 
     var markdownCustom = {
       host: this.props.host,
