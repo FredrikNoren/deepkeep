@@ -91,6 +91,10 @@ Project.styles = `
 }
 .${P}-sidebar-item {
   margin-bottom: 10px;
+  .${ValidatedBadge.classPrefix} {
+    margin-bottom: 21px;
+    margin-top: 12px;
+  }
 }
 .${P}-install {
   background: rgba(0, 0, 0, 0.17);
