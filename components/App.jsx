@@ -5,19 +5,35 @@ var classnames = require('classnames');
 var P = 'app'; // style class name prefix
 
 class App extends React.Component {
+  login(e) {
+    e.preventDefault();
+    var lock = new Auth0Lock(this.props.auth0ClientID, this.props.auth0Domain);
+
+    lock.show({
+        callbackURL: 'http://' + this.props.host + '/auth/callback',
+        responseType: 'code',
+        authParams: {
+          scope: 'openid profile'
+        },
+        usernameStyle: 'username'
+    });
+  }
+  logout(e) {
+    e.preventDefault();
+    var lock = new Auth0Lock(this.props.auth0ClientID, this.props.auth0Domain);
+    lock.logout({ returnTo: 'http://' + this.props.host + '/' });
+  }
   render() {
     var profileSection = null;
     if (this.props.profileName) {
       profileSection = <div>
         <a href={this.props.profileLink}>{this.props.profileName}</a>
         &nbsp;
-        <a href="/logout" className="muted">Log out</a>
+        <a href="#" onClick={this.logout.bind(this)} className="muted">Logout</a>
       </div>
     } else {
       profileSection = <div>
-        <a href="/register" className="muted">Sign up</a>
-        &nbsp;-&nbsp;
-        <a href="/login" className="muted">Log in</a>
+        <a href="#" onClick={this.login.bind(this)} className="muted">Login in / Sign up</a>
       </div>
     }
     return (<div>

@@ -18,6 +18,7 @@ var Html = React.createClass({
         </head>
         <body>
           <div id="main" dangerouslySetInnerHTML={{__html: this.props.html}}></div>
+          <script src="https://cdn.auth0.com/js/lock-7.5.min.js"></script>
           <script src="/bundle.js" />
           <script dangerouslySetInnerHTML={{__html: this.props.script}}></script>
           <script dangerouslySetInnerHTML={{__html: `
