@@ -20,6 +20,7 @@ var pg = require('pg');
 var passport = require('passport');
 var Auth0Strategy = require('passport-auth0');
 var elasticsearch = require('elasticsearch');
+var Auth0 = require('auth0');
 var React = require('react');
 require('node-jsx').install({extension: '.jsx', harmony: true });
 var FSStorage = require('./server/fsstorage');
@@ -50,6 +51,11 @@ function runSQLFile(filename, callback) {
   });
 }
 
+var auth0api = new Auth0({
+  domain: process.env.AUTH0_DOMAIN,
+  clientID: process.env.AUTH0_CLIENT_ID,
+  clientSecret: process.env.AUTH0_CLIENT_SECRET,
+});
 
 var strategy = new Auth0Strategy({
     domain: process.env.AUTH0_DOMAIN,
@@ -441,18 +447,13 @@ app.get('/search', function(req, res, next) {
 }, renderPage);
 
 function lookupPathUser(req, res, next) {
-  req.app.get('stormpathApplication').getAccounts({ username: req.params.username }, function(err, accounts) {
+  auth0api.getUserBySearch('username:' + req.params.username, function(err, accounts) {
     if (err || !accounts || accounts.size == 0) {
       return renderPage('Error', {content: {message: 'Unknown user.'}}, req, res);
     }
-    req.pathUser = accounts.items[0];
-    req.pathUser.id = stormpathUserHrefToId(req.pathUser.href);
+    req.pathUser = accounts[0];
     next();
   });
-}
-
-function stormpathUserHrefToId(href) {
-  return href.substring('https://api.stormpath.com/v1/accounts/'.length);
 }
 
 function pgClient(req, res, next) {
