@@ -66,6 +66,7 @@ passport.use(new Auth0Strategy({
     // accessToken is the token to call Auth0 API (not needed in the most cases)
     // extraParams.id_token has the JSON Web Token
     // profile has all the information from the user
+    profile.username = profile._json.username;
     return done(null, profile);
   }));
 
@@ -125,7 +126,7 @@ app.get('/auth/callback',
       throw new Error('user null');
     }
     console.log(req.user);
-    res.redirect('/' + req.user._json.username);
+    res.redirect('/' + req.user.username);
   });
 
 var esClient = new elasticsearch.Client({
@@ -490,7 +491,6 @@ function pgClient(req, res, next) {
 }
 
 app.get('/:username', lookupPathUser, function(req, res, next) {
-
   var data = req.renderData = {};
   data.component = 'User';
   data.content = {};

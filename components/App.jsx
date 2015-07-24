@@ -5,7 +5,8 @@ var classnames = require('classnames');
 var P = 'app'; // style class name prefix
 
 class App extends React.Component {
-  login() {
+  login(e) {
+    e.preventDefault();
     var lock = new Auth0Lock(this.props.auth0ClientID, this.props.auth0Domain);
 
     lock.show({
@@ -16,7 +17,11 @@ class App extends React.Component {
         },
         usernameStyle: 'username'
     });
-    return false;
+  }
+  logout(e) {
+    e.preventDefault();
+    var lock = new Auth0Lock(this.props.auth0ClientID, this.props.auth0Domain);
+    lock.logout({ returnTo: 'http://' + this.props.host + '/' });
   }
   render() {
     var profileSection = null;
@@ -24,7 +29,7 @@ class App extends React.Component {
       profileSection = <div>
         <a href={this.props.profileLink}>{this.props.profileName}</a>
         &nbsp;
-        <a href="/logout" className="muted">Log out</a>
+        <a href="#" onClick={this.logout.bind(this)} className="muted">Logout</a>
       </div>
     } else {
       profileSection = <div>
