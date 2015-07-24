@@ -13,13 +13,13 @@ var Html = React.createClass({
           <link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css" />
           <link rel="icon" type="image/png" href="/static/favicon-32x32.png" sizes="32x32" />
           <link rel="icon" type="image/png" href="/static/favicon-16x16.png" sizes="16x16" />
-          <link href="/bundle.css" rel="stylesheet" />
+          <link href="/static/styles.css" rel="stylesheet" />
           <title>deepkeep</title>
         </head>
         <body>
           <div id="main" dangerouslySetInnerHTML={{__html: this.props.html}}></div>
           <script src="https://cdn.auth0.com/js/lock-7.5.min.js"></script>
-          <script src="/bundle.js" />
+          <script src="/static/bundle.js" />
           <script dangerouslySetInnerHTML={{__html: this.props.script}}></script>
           <script dangerouslySetInnerHTML={{__html: `
             (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){

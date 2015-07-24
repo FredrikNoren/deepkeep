@@ -1,19 +1,14 @@
 var fs = require('fs');
-var path = require('path');
 var express = require('express');
 var bodyParser = require('body-parser');
 var async = require('async');
 var moment = require('moment');
 var multer  = require('multer');
 var qs = require('querystring');
-var less = require('less');
-var UglifyJS = require('uglify-js');
 var AdmZip = require('adm-zip');
-var browserify = require('browserify');
 var http = require('http');
 var compression = require('compression');
 var request = require('request-promise');
-var streamToBuffer = require('stream-to-buffer');
 var uuid = require('uuid');
 var pg = require('pg');
 var passport = require('passport');
@@ -26,6 +21,10 @@ require('node-jsx').install({extension: '.jsx', harmony: true });
 var FSStorage = require('./server/fsstorage');
 var S3Storage = require('./server/s3storage');
 var PartialQuery = require('./server/partialquery');
+
+if (process.env.DEVELOP || !fs.existsSync('static/styles.css') || !fs.existsSync('static/bundle.js')) {
+  require('./build.js'); // build static assets
+}
 
 var app = express();
 
@@ -157,60 +156,6 @@ function clientQuery(client, sql, params) {
     else client.query(sql, handler);
   });
 }
-
-(function createBundle() {
-  var b = browserify();
-  var browserifyArgs = fs.readdirSync('components').map(function(component) {
-    console.log('Adding', './components/' + component)
-    b.require('./components/' + component, { entry: false, expose: component.substring(0, component.length - '.jsx'.length) });
-  });
-  b.require('react');
-  b.transform('reactify', { es6: true });
-  b.transform('brfs');
-  var bundle = 'throw new Error("Bundle not ready yet!")';
-  streamToBuffer(b.bundle(), function(err, buffer) {
-    if (err) {
-      console.log(err);
-      process.exit();
-    }
-    bundle = buffer.toString();
-    console.log('Bundle created');
-    if (!process.env.DEVELOP) {
-      var result = UglifyJS.minify(bundle, {fromString: true});
-      console.log('Bundle minified');
-      bundle = result.code;
-    }
-    console.log("\007");
-  });
-
-  app.get('/bundle.js', compression(), function(req, res) {
-    res.setHeader('Content-Type', 'application/javascript');
-    res.send(bundle);
-  });
-})();
-
-(function createCss() {
-  var source = fs.readdirSync('components').map(function(component) {
-    var c = require('./components/' + component);
-    return c.styles || '';
-  }).join('\n');
-  source += '\n' + fs.readFileSync('styles.less');
-  var lessCss = '';
-  less.render(source, { filename: path.resolve('./styles.less') }, function(error, output) {
-    if (error) {
-      fs.writeFileSync('tmp.error.less', source);
-      console.log(error);
-      process.exit();
-    }
-    lessCss = output.css;
-    console.log('Less compiled')
-  });
-  app.get('/bundle.css', function(req, res) {
-    res.setHeader('Content-Type', 'application/css');
-    res.send(lessCss);
-  });
-})()
-
 
 var components = {};
 fs.readdirSync('components').map(function(component) {
