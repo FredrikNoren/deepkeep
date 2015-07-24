@@ -272,10 +272,10 @@ app.post('/api/v1/upload', pgClient, passport.authenticate('basic', { session: f
                     [req.user.user_id, packageJson.name, packageJson.version, verifier.name, 'RUNNING'])
               .then(function() {
                 http.request({
-                  hostname: 'localhost',
-                  port: 8080,
-                  path: '/api/v0/dummyverify?' + qs.stringify({
-                    verificationImage: verifier.name,
+                  hostname: 'http://validator.deepkeep.co',
+                  path: '/api/v0/validate?' + qs.stringify({
+                    validator: verifier.name,
+                    project: user.name + '/' + packageJson.name,
                     callback: 'http://' + req.headers.host + '/private/api/v1/verified?' + qs.stringify({
                       userid: req.user.user_id,
                       projectName: packageJson.name,
