@@ -137,7 +137,7 @@ app.use(function requestLogger(req, res, next) {
   next();
 });
 
-app.use('/static', express.static('static'));
+app.use('/static', compression(), express.static('static'));
 
 app.get('/reset', function(req, res) {
   runSQLFile('schema.sql', function() {
