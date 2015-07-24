@@ -4,7 +4,7 @@ var express = require('express');
 var bodyParser = require('body-parser');
 var async = require('async');
 var moment = require('moment');
-var stormpath = require('express-stormpath');
+//var stormpath = require('express-stormpath');
 var multer  = require('multer');
 var qs = require('querystring');
 var less = require('less');
@@ -17,6 +17,8 @@ var auth = require('basic-auth');
 var streamToBuffer = require('stream-to-buffer');
 var uuid = require('uuid');
 var pg = require('pg');
+var passport = require('passport');
+var Auth0Strategy = require('passport-auth0');
 var elasticsearch = require('elasticsearch');
 var React = require('react');
 require('node-jsx').install({extension: '.jsx', harmony: true });
@@ -48,29 +50,47 @@ function runSQLFile(filename, callback) {
   });
 }
 
-app.use(stormpath.init(app, {
-    apiKeyFile: 'apiKey-2RZ5G43WQYYMW6GFWTM865I17.properties',
-    application: 'https://api.stormpath.com/v1/applications/6xIObjnyqyxBynY5R7shov',
-    secretKey: 'some_long_random_string',
-    enableUsername: true,
-    requireUsername: true,
-    debug: true,
-    postLoginHandler: function(account, req, res, next) {
-      account.id = stormpathUserHrefToId(account.href);
-      next();
-    },
-    postRegistrationHandler: function(account, req, res, next) {
-      pg.connect(DATABASE_URL, function(err, client, closeClient) {
-        persistlog(client, {
-          event: 'user-registered',
-          account: account
-        }).then(function() {
-          closeClient();
-        });
-        next();
-      });
-    },
-}));
+
+var strategy = new Auth0Strategy({
+    domain: process.env.AUTH0_DOMAIN,
+    clientID: process.env.AUTH0_CLIENT_ID,
+    clientSecret: process.env.AUTH0_CLIENT_SECRET,
+    callbackURL: '/auth/callback'
+  }, function(accessToken, refreshToken, extraParams, profile, done) {
+    // accessToken is the token to call Auth0 API (not needed in the most cases)
+    // extraParams.id_token has the JSON Web Token
+    // profile has all the information from the user
+    return done(null, profile);
+  });
+
+passport.use(strategy);
+
+// This is not a best practice, but we want to keep things simple for now
+passport.serializeUser(function(user, done) {
+  done(null, user);
+});
+
+passport.deserializeUser(function(user, done) {
+  done(null, user);
+});
+
+var cookieParser = require('cookie-parser');
+var session = require('express-session');
+
+app.use(cookieParser());
+app.use(session({ secret: 'shhhhhhhhh' }));
+app.use(passport.initialize());
+app.use(passport.session());
+
+app.get('/auth/callback',
+  passport.authenticate('auth0', { failureRedirect: '/url-if-something-fails' }),
+  function(req, res) {
+    if (!req.user) {
+      throw new Error('user null');
+    }
+    console.log(req.user);
+    res.redirect('/' + req.user._json.username);
+  });
 
 var esClient = new elasticsearch.Client({
   host: process.env.BONSAI_URL || 'localhost:9200'
@@ -166,6 +186,9 @@ function safeStringify(obj) {
 }
 function renderPage(req, res) {
   var data = req.renderData;
+  data.host = req.headers.host;
+  data.auth0Domain = process.env.AUTH0_DOMAIN;
+  data.auth0ClientID = process.env.AUTH0_CLIENT_ID;
   if (req.user) {
     data.profileName = req.user.username;
     data.profileLink = '/' + req.user.username;
