@@ -4,7 +4,6 @@ var express = require('express');
 var bodyParser = require('body-parser');
 var async = require('async');
 var moment = require('moment');
-//var stormpath = require('express-stormpath');
 var multer  = require('multer');
 var qs = require('querystring');
 var less = require('less');
@@ -13,12 +12,13 @@ var AdmZip = require('adm-zip');
 var browserify = require('browserify');
 var http = require('http');
 var compression = require('compression');
-var auth = require('basic-auth');
+var request = require('request-promise');
 var streamToBuffer = require('stream-to-buffer');
 var uuid = require('uuid');
 var pg = require('pg');
 var passport = require('passport');
 var Auth0Strategy = require('passport-auth0');
+var BasicStrategy = require('passport-http').BasicStrategy;
 var elasticsearch = require('elasticsearch');
 var Auth0 = require('auth0');
 var React = require('react');
@@ -57,7 +57,7 @@ var auth0api = new Auth0({
   clientSecret: process.env.AUTH0_CLIENT_SECRET,
 });
 
-var strategy = new Auth0Strategy({
+passport.use(new Auth0Strategy({
     domain: process.env.AUTH0_DOMAIN,
     clientID: process.env.AUTH0_CLIENT_ID,
     clientSecret: process.env.AUTH0_CLIENT_SECRET,
@@ -67,9 +67,39 @@ var strategy = new Auth0Strategy({
     // extraParams.id_token has the JSON Web Token
     // profile has all the information from the user
     return done(null, profile);
-  });
+  }));
 
-passport.use(strategy);
+passport.use(new BasicStrategy(
+  function(userid, password, done) {
+    request.post({
+      url: 'https://' + process.env.AUTH0_DOMAIN + '/oauth/ro',
+      json: {
+        client_id: process.env.AUTH0_CLIENT_ID,
+        username: userid,
+        password: password,
+        connection: 'Username-Password-Authentication',
+        grant_type: 'password',
+        scope: 'openid profile'
+      }
+    }).then(function(res) {
+      request.get({
+        url: 'https://' + process.env.AUTH0_DOMAIN + '/userinfo',
+        headers: {
+          Authorization: 'Bearer ' + res.access_token
+        }
+      }).then(function(account) {
+        done(null, JSON.parse(account));
+      }).catch(function(err) {
+        done(err);
+      });
+    }).catch(function(err) {
+      console.log('BasicStrategy login error', err);
+      if (!err) done({ error: 'unknown' });
+      else if (err.error.error == 'invalid_user_password') done(null, false);
+      else done(err.error);
+    });
+  }
+));
 
 // This is not a best practice, but we want to keep things simple for now
 passport.serializeUser(function(user, done) {
@@ -244,104 +274,95 @@ app.get('/favicon.ico', function(req, res) {
   res.sendfile('static/favicon.ico');
 });
 
-app.post('/api/v1/upload', pgClient, multer({ dest: './uploads/' }), function(req, res, next) {
+app.post('/api/v1/upload', pgClient, passport.authenticate('basic', { session: false }), multer({ dest: './uploads/' }), function(req, res, next) {
   console.log(req.files);
+  console.log(req.user);
   persistlog(req.pgClient, {
     type: 'upload-attempt',
     requestId: req.requestId
   });
-  var user = auth(req);
-  req.app.get('stormpathApplication').authenticateAccount({
-    username: user.name,
-    password: user.pass
-  }, function(err, result) {
-    if (err) {
-      res.status(401).send(err.userMessage);
-      return;
-    }
-    var stormpathUser = result.account;
-    stormpathUser.id = stormpathUserHrefToId(stormpathUser.href);
 
-    var zip = new AdmZip(req.files.package.path);
-    var packageJson = zip.readAsText('package.json');
-    var readme = zip.readAsText('README.md');
-    try {
-      packageJson = JSON.parse(packageJson);
-    } catch(err) {
-      res.status(400).send('Could not parse package.json');
+  var zip = new AdmZip(req.files.package.path);
+  var packageJson = zip.readAsText('package.json');
+  var readme = zip.readAsText('README.md');
+  try {
+    packageJson = JSON.parse(packageJson);
+  } catch(err) {
+    res.status(400).send('Could not parse package.json');
+    return;
+  }
+  console.log(packageJson);
+  var body = fs.createReadStream(req.files.package.path);
+  var key = req.user.user_id + '-' + packageJson.name + '-' + packageJson.version + '.zip';
+  storage.exists(key).then(function(exists) {
+    if (exists) {
+      res.status(409).send('Package already extists at version ' + packageJson.version);
       return;
     }
-    console.log(packageJson);
-    var body = fs.createReadStream(req.files.package.path);
-    var key = stormpathUser.id + '-' + packageJson.name + '-' + packageJson.version + '.zip';
-    storage.exists(key).then(function(exists) {
-      if (exists) {
-        res.status(409).send('Package already extists at version ' + packageJson.version);
-        return;
-      }
-      return storage.upload(key, body)
-        .then(clientQuery(req.pgClient, 'insert into cached_project_versions (userid, projectname, version, username, readme) values ($1, $2, $3, $4, $5)',
-                [stormpathUser.id, packageJson.name, packageJson.version, stormpathUser.username, readme]))
-        .then(function() {
-          // add the username for consistency
-          packageJson.username = user.name;
-          esClient.index({
-            index: 'docs',
-            type: 'doc',
-            id: user.name + '/' + packageJson.name,
-            body: packageJson
-          }, function(err, response) {
-            if (err) {
-              // don't let this fail the request. we can run reindex jobs
-              // nightly or something along those lines.
-              console.log('failed to index package.json', err);
-            }
-          });
-        })
-        .then(function() {
-          console.log('Checking for verifiers...', packageJson.verifiers)
-          if (packageJson.verifiers) {
-            packageJson.verifiers.forEach(function(verifier) {
-              clientQuery(req.pgClient, 'insert into cached_project_verifications (userid, projectname, version, verificationName, status) values ($1, $2, $3, $4, $5)',
-                      [stormpathUser.id, packageJson.name, packageJson.version, verifier.name, 'RUNNING'])
-                .then(function() {
-                  http.request({
-                    hostname: 'localhost',
-                    port: 8080,
-                    path: '/api/v0/dummyverify?' + qs.stringify({
-                      verificationImage: verifier.name,
-                      callback: 'http://' + req.headers.host + '/private/api/v1/verified?' + qs.stringify({
-                        userid: stormpathUser.id,
-                        projectName: packageJson.name,
-                        version: packageJson.version,
-                        verificationName: verifier.name
-                      })
-                    }),
-                    method: 'POST'
-                  }, function(res) {
-                    console.log('Verify post result', res.statusCode);
-                  }).end();
-                }).catch(printError);
-            });
+    return storage.upload(key, body)
+      .then(clientQuery(req.pgClient, 'insert into cached_project_versions (userid, projectname, version, username, readme) values ($1, $2, $3, $4, $5)',
+              [req.user.user_id, packageJson.name, packageJson.version, req.user.username, readme]))
+      .then(function() {
+        // add the username for consistency
+        packageJson.username = req.user.username;
+        esClient.index({
+          index: 'docs',
+          type: 'doc',
+          id: req.user.username + '/' + packageJson.name,
+          body: packageJson
+        }, function(err, response) {
+          if (err) {
+            // don't let this fail the request. we can run reindex jobs
+            // nightly or something along those lines.
+            console.log('failed to index package.json', err);
           }
-        })
-        .then(function() {
-          persistlog(req.pgClient, {
-            type: 'upload-success',
-            requestId: req.requestId,
-            loggedInUserHref: stormpathUser.href,
-            loggedInUserId: stormpathUser.id,
-            loggedInUsername: stormpathUser.username,
-            uploadFileKey: key,
-            packageJson: packageJson
+        });
+      })
+      .then(function() {
+        console.log('Checking for verifiers...', packageJson.verifiers)
+        if (packageJson.verifiers) {
+          packageJson.verifiers.forEach(function(verifier) {
+            clientQuery(req.pgClient, 'insert into cached_project_verifications (userid, projectname, version, verificationName, status) values ($1, $2, $3, $4, $5)',
+                    [req.user.user_id, packageJson.name, packageJson.version, verifier.name, 'RUNNING'])
+              .then(function() {
+                http.request({
+                  hostname: 'localhost',
+                  port: 8080,
+                  path: '/api/v0/dummyverify?' + qs.stringify({
+                    verificationImage: verifier.name,
+                    callback: 'http://' + req.headers.host + '/private/api/v1/verified?' + qs.stringify({
+                      userid: req.user.user_id,
+                      projectName: packageJson.name,
+                      version: packageJson.version,
+                      verificationName: verifier.name
+                    })
+                  }),
+                  method: 'POST'
+                }, function(res) {
+                  console.log('Verify post result', res.statusCode);
+                }).end();
+              }).catch(printError);
           });
-        })
-        .then(function() {
-          req.pgCloseClient();
-          res.send('OK');
-        })
-    }).catch(next);
-  });
+        }
+      })
+      .then(function() {
+        persistlog(req.pgClient, {
+          type: 'upload-success',
+          requestId: req.requestId,
+          loggedInUserId: req.user.user_id,
+          loggedInUsername: req.user.username,
+          uploadFileKey: key,
+          packageJson: packageJson
+        });
+      })
+      .then(function() {
+        req.pgCloseClient();
+        res.json({
+          status: 'success',
+          path: '/' + req.user.username + '/' + packageJson.name + '/' + packageJson.version + '/package.zip'
+        });
+      })
+  }).catch(next);
 });
 
 app.post('/private/api/v1/verified', pgClient, function(req, res, next) {
@@ -476,7 +497,7 @@ app.get('/:username', lookupPathUser, function(req, res, next) {
   data.content.username = req.params.username;
 
   clientQuery(req.pgClient, 'select projectname from cached_project_versions where userid=$1 group by projectname',
-          [req.pathUser.id])
+          [req.pathUser.user_id])
     .then(function(result) {
       req.pgCloseClient();
       console.log('Insert res', result);
@@ -497,7 +518,7 @@ function renderProject(req, res, next) {
   data.content.host = req.headers.host;
 
   clientQuery(req.pgClient, 'select * from cached_project_versions where userid=$1 and projectname=$2 order by version desc',
-          [req.pathUser.id, req.params.project])
+          [req.pathUser.user_id, req.params.project])
     .then(function(result) {
       req.pgCloseClient();
       //console.log('Insert res', result);
@@ -523,7 +544,7 @@ function renderProject(req, res, next) {
 
 
       return clientQuery(req.pgClient, 'select * from cached_project_verifications where userid=$1 and projectname=$2 and version=$3',
-        [req.pathUser.id, req.params.project, data.content.version])
+        [req.pathUser.user_id, req.params.project, data.content.version])
         .then(function(validations) {
           data.content.validations = validations.rows;
           renderPage(req, res);
@@ -537,7 +558,7 @@ app.get('/:username/:project', lookupPathUser, renderProject);
 
 app.get('/:username/:project/package.zip', lookupPathUser, function(req, res, next) {
   clientQuery(req.pgClient, 'select * from cached_project_versions where userid=$1 and projectname=$2 order by version desc limit 1',
-          [req.pathUser.id, req.params.project])
+          [req.pathUser.user_id, req.params.project])
     .then(function(result) {
       req.pgCloseClient();
       res.redirect('/' + req.params.username + '/' + req.params.project + '/' + result.rows[0].version + '/package.zip');
@@ -549,7 +570,7 @@ app.get('/:username/:project/package.zip', lookupPathUser, function(req, res, ne
 app.get('/:username/:project/:version', lookupPathUser, renderProject);
 
 app.get('/:username/:project/:version/package.zip', lookupPathUser, function(req, res, next) {
-  var key = req.pathUser.id + '-' + req.params.project + '-' + req.params.version + '.zip';
+  var key = req.pathUser.user_id + '-' + req.params.project + '-' + req.params.version + '.zip';
   persistlog(req.pgClient, {
     type: 'download-package',
     requestId: req.requestId,
