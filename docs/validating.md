@@ -12,13 +12,13 @@ All you have to do is add which validators you want to run on it in the
 {
   "name": "xor",
   "version": "1.0",
-  "verifiers": [
+  "validators": [
     {
-      "name": "deepkeep/xor-verify"
+      "name": "deepkeep/xor-validate"
     }
   ]
 }
 ```
 
-You can also write your own verifiers. See
+You can also write your own validators. See
 [xor validate](https://github.com/deepkeep/xor-validate) for an example.

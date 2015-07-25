@@ -265,27 +265,27 @@ app.post('/api/v1/upload', pgClient, passport.authenticate('basic', { session: f
         });
       })
       .then(function() {
-        console.log('Checking for verifiers...', packageJson.verifiers)
-        if (packageJson.verifiers) {
-          packageJson.verifiers.forEach(function(verifier) {
-            clientQuery(req.pgClient, 'insert into cached_project_verifications (userid, projectname, version, verificationName, status) values ($1, $2, $3, $4, $5)',
-                    [req.user.user_id, packageJson.name, packageJson.version, verifier.name, 'RUNNING'])
+        console.log('Checking for validators...', packageJson.validators)
+        if (packageJson.validators) {
+          packageJson.validators.forEach(function(validator) {
+            clientQuery(req.pgClient, 'insert into cached_project_validations (userid, projectname, version, validationname, status) values ($1, $2, $3, $4, $5)',
+                    [req.user.user_id, packageJson.name, packageJson.version, validator.name, 'RUNNING'])
               .then(function() {
                 http.request({
                   hostname: 'http://validator.deepkeep.co',
                   path: '/api/v0/validate?' + qs.stringify({
-                    validator: verifier.name,
+                    validator: validator.name,
                     project: user.name + '/' + packageJson.name,
-                    callback: 'http://' + req.headers.host + '/private/api/v1/verified?' + qs.stringify({
+                    callback: 'http://' + req.headers.host + '/private/api/v1/validated?' + qs.stringify({
                       userid: req.user.user_id,
                       projectName: packageJson.name,
                       version: packageJson.version,
-                      verificationName: verifier.name
+                      validationname: validator.name
                     })
                   }),
                   method: 'POST'
                 }, function(res) {
-                  console.log('Verify post result', res.statusCode);
+                  console.log('Validate post result', res.statusCode);
                 }).end();
               }).catch(printError);
           });
@@ -311,10 +311,10 @@ app.post('/api/v1/upload', pgClient, passport.authenticate('basic', { session: f
   }).catch(next);
 });
 
-app.post('/private/api/v1/verified', pgClient, function(req, res, next) {
-  console.log('GOT VERIFIED', req.body);
-  clientQuery(req.pgClient, 'update cached_project_verifications set status=$1 where userid=$2 and projectname=$3 and version=$4 and verificationName=$5',
-          [req.body.score, req.query.userid, req.query.projectName, req.query.version, req.query.verificationName])
+app.post('/private/api/v1/validated', pgClient, function(req, res, next) {
+  console.log('GOT VALIDATED', req.body);
+  clientQuery(req.pgClient, 'update cached_project_validations set status=$1 where userid=$2 and projectname=$3 and version=$4 and validationname=$5',
+          [req.body.score, req.query.userid, req.query.projectName, req.query.version, req.query.validationname])
     .then(function() {
       res.json({ status: 'ok' });
     });
@@ -488,7 +488,7 @@ function renderProject(req, res, next) {
       data.content.downloadPath = '/' + req.params.username + '/' + req.params.project + '/' + activeVersion.version + '/package.zip';
 
 
-      return clientQuery(req.pgClient, 'select * from cached_project_verifications where userid=$1 and projectname=$2 and version=$3',
+      return clientQuery(req.pgClient, 'select * from cached_project_validations where userid=$1 and projectname=$2 and version=$3',
         [req.pathUser.user_id, req.params.project, data.content.version])
         .then(function(validations) {
           data.content.validations = validations.rows;
