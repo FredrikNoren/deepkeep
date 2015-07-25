@@ -18,7 +18,7 @@ class Home extends React.Component {
     var markdownCustom = {
       host: this.props.host,
       'validated-badge': badgeHtml,
-      'icon-get': '<i class="fa fa-cloud-download"></i>',
+      'icon-get': '<i class="fa fa-download"></i>',
       'icon-host': '<i class="fa fa-cubes"></i>',
       'icon-validate': '<i class="fa fa-check-circle-o"></i>',
     }
@@ -44,7 +44,7 @@ class Home extends React.Component {
         <div className={`${P}-features`}>
           <div className="row">
             <div className={`${P}-feature four columns`}>
-              <div className={`${P}-feature-icon`}><i className="fa fa-cloud-download"></i></div>
+              <div className={`${P}-feature-icon`}><i className="fa fa-download"></i></div>
               <div className={`${P}-feature-title`}>Get</div>
               <div><div className={`${P}-feature-online`}><i className="fa fa-check"></i> Online</div></div>
               Download community supplied neural networks, trained and ready to be
@@ -54,7 +54,7 @@ class Home extends React.Component {
               <div className={`${P}-feature-icon`}><i className="fa fa-cubes"></i></div>
               <div className={`${P}-feature-title`}>Host</div>
               <div><div className={`${P}-feature-online`}><i className="fa fa-check"></i> Online</div></div>
-              Package up and host your trained neural networks securely.
+              Package up and host your trained neural networks on deepkeep.
             </div>
             <div className={`${P}-feature four columns`}>
               <div className={`${P}-feature-icon`}><i className="fa fa-check-circle-o"></i></div>
@@ -69,7 +69,7 @@ class Home extends React.Component {
               <div className={`${P}-feature-icon`}><i className="fa fa-exchange"></i></div>
               <div className={`${P}-feature-title`}>Marketplace</div>
               <div><div className={`${P}-feature-in-progress`}><i className="fa fa-circle-o-notch"></i> In progress</div></div>
-              Buy and sell trained networks.
+              Buy and sell trained neural networks.
             </div>
             <div className={`${P}-feature four columns`}>
               <div className={`${P}-feature-icon`}><i className="fa fa-code-fork"></i></div>
@@ -82,7 +82,7 @@ class Home extends React.Component {
               <div className={`${P}-feature-icon`}><i className="fa fa-database"></i></div>
               <div className={`${P}-feature-title`}>Datasets</div>
               <div><div className={`${P}-feature-in-progress`}><i className="fa fa-circle-o-notch"></i> In progress</div></div>
-              Host and use large datasets.
+              Access and host large datasets for training and validation.
             </div>
           </div>
         </div>
