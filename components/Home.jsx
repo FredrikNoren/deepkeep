@@ -142,7 +142,7 @@ Home.styles = `
       display: block;
       @media (max-width: 500px) {
         & {
-          font-size: 65px;
+          font-size: 50px;
         }
       }
     }
