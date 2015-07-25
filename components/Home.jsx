@@ -123,6 +123,8 @@ class Home extends React.Component {
           <a href="http://twitter.com/chedkid">Falcon</a>
         </div>
       </div>
+      <div><i>Chat with us on slack!</i></div>
+      <script async="true" defer="true" src="http://slackin.deepkeep.co/slackin.js?large"></script>
     </div>
 
   </div>
