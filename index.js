@@ -272,10 +272,10 @@ app.post('/api/v1/upload', pgClient, passport.authenticate('basic', { session: f
                     [req.user.user_id, packageJson.name, packageJson.version, validator.name, 'RUNNING'])
               .then(function() {
                 http.request({
-                  hostname: 'http://validator.deepkeep.co',
+                  hostname: 'validator.deepkeep.co',
                   path: '/api/v0/validate?' + qs.stringify({
                     validator: validator.name,
-                    project: user.name + '/' + packageJson.name,
+                    project: req.user.username + '/' + packageJson.name,
                     callback: 'http://' + req.headers.host + '/private/api/v1/validated?' + qs.stringify({
                       userid: req.user.user_id,
                       projectName: packageJson.name,
