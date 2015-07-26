@@ -32,6 +32,7 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
 var DATABASE_URL = process.env.DATABASE_URL || 'postgres://localhost:5432/deepstack';
+console.log('Using postgres database: ', DATABASE_URL);
 
 function runSQLFile(filename, callback) {
   var statements = fs.readFileSync(filename).toString().split(';');
