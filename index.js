@@ -18,8 +18,6 @@ var elasticsearch = require('elasticsearch');
 var Auth0 = require('auth0');
 var React = require('react');
 require('node-jsx').install({extension: '.jsx', harmony: true });
-var FSStorage = require('./server/fsstorage');
-var S3Storage = require('./server/s3storage');
 var PartialQuery = require('./server/partialquery');
 
 if (process.env.DEVELOP || !fs.existsSync('static/styles.css') || !fs.existsSync('static/bundle.js')) {
@@ -200,10 +198,6 @@ var queries = {};
 queries.allProjects = new PartialQuery('select userid, projectname, username from cached_project_versions group by userid, projectname, username');
 queries.countAllProject = new PartialQuery('select count(*) as nprojects from ($[allProjects]) as allprojects', { allProjects: queries.allProjects });
 
-var storage;
-if (process.env.AWS_ACCESS_KEY) storage = new S3Storage();
-else storage = new FSStorage(app);
-
 function persistlog(pgClient, data) {
   data.timestamp = Date.now();
   console.log('Persistent logging', data);
@@ -221,96 +215,96 @@ app.get('/favicon.ico', function(req, res) {
   res.sendfile('static/favicon.ico');
 });
 
-app.post('/api/v1/upload', pgClient, passport.authenticate('basic', { session: false }), multer({ dest: './uploads/' }), function(req, res, next) {
-  console.log(req.files);
-  console.log(req.user);
-  persistlog(req.pgClient, {
-    type: 'upload-attempt',
-    requestId: req.requestId
-  });
-
-  var zip = new AdmZip(req.files.package.path);
-  var packageJson = zip.readAsText('package.json');
-  var readme = zip.readAsText('README.md');
-  try {
-    packageJson = JSON.parse(packageJson);
-  } catch(err) {
-    res.status(400).send('Could not parse package.json');
-    return;
-  }
-  console.log(packageJson);
-  var body = fs.createReadStream(req.files.package.path);
-  var key = req.user.user_id + '-' + packageJson.name + '-' + packageJson.version + '.zip';
-  storage.exists(key).then(function(exists) {
-    if (exists) {
-      res.status(409).send('Package already extists at version ' + packageJson.version);
-      return;
-    }
-    return storage.upload(key, body)
-      .then(clientQuery(req.pgClient, 'insert into cached_project_versions (userid, projectname, version, username, readme) values ($1, $2, $3, $4, $5)',
-              [req.user.user_id, packageJson.name, packageJson.version, req.user.username, readme]))
-      .then(function() {
-        // add the username for consistency
-        packageJson.username = req.user.username;
-        esClient.index({
-          index: 'docs',
-          type: 'doc',
-          id: req.user.username + '/' + packageJson.name,
-          body: packageJson
-        }, function(err, response) {
-          if (err) {
-            // don't let this fail the request. we can run reindex jobs
-            // nightly or something along those lines.
-            console.log('failed to index package.json', err);
-          }
-        });
-      })
-      .then(function() {
-        console.log('Checking for validators...', packageJson.validators)
-        if (packageJson.validators) {
-          packageJson.validators.forEach(function(validator) {
-            clientQuery(req.pgClient, 'insert into cached_project_validations (userid, projectname, version, validationname, status) values ($1, $2, $3, $4, $5)',
-                    [req.user.user_id, packageJson.name, packageJson.version, validator.name, 'RUNNING'])
-              .then(function() {
-                http.request({
-                  hostname: 'validator.deepkeep.co',
-                  path: '/api/v0/validate?' + qs.stringify({
-                    validator: validator.name,
-                    project: req.user.username + '/' + packageJson.name,
-                    callback: 'http://' + req.headers.host + '/private/api/v1/validated?' + qs.stringify({
-                      userid: req.user.user_id,
-                      projectName: packageJson.name,
-                      version: packageJson.version,
-                      validationname: validator.name
-                    })
-                  }),
-                  method: 'POST'
-                }, function(res) {
-                  console.log('Validate post result', res.statusCode);
-                }).end();
-              }).catch(printError);
-          });
-        }
-      })
-      .then(function() {
-        persistlog(req.pgClient, {
-          type: 'upload-success',
-          requestId: req.requestId,
-          loggedInUserId: req.user.user_id,
-          loggedInUsername: req.user.username,
-          uploadFileKey: key,
-          packageJson: packageJson
-        });
-      })
-      .then(function() {
-        req.pgCloseClient();
-        res.json({
-          status: 'success',
-          path: '/' + req.user.username + '/' + packageJson.name + '/' + packageJson.version + '/package.zip'
-        });
-      })
-  }).catch(next);
-});
+// app.post('/api/v1/upload', pgClient, passport.authenticate('basic', { session: false }), multer({ dest: './uploads/' }), function(req, res, next) {
+//   console.log(req.files);
+//   console.log(req.user);
+//   persistlog(req.pgClient, {
+//     type: 'upload-attempt',
+//     requestId: req.requestId
+//   });
+//
+//   var zip = new AdmZip(req.files.package.path);
+//   var packageJson = zip.readAsText('package.json');
+//   var readme = zip.readAsText('README.md');
+//   try {
+//     packageJson = JSON.parse(packageJson);
+//   } catch(err) {
+//     res.status(400).send('Could not parse package.json');
+//     return;
+//   }
+//   console.log(packageJson);
+//   var body = fs.createReadStream(req.files.package.path);
+//   var key = req.user.user_id + '-' + packageJson.name + '-' + packageJson.version + '.zip';
+//   storage.exists(key).then(function(exists) {
+//     if (exists) {
+//       res.status(409).send('Package already extists at version ' + packageJson.version);
+//       return;
+//     }
+//     return storage.upload(key, body)
+//       .then(clientQuery(req.pgClient, 'insert into cached_project_versions (userid, projectname, version, username, readme) values ($1, $2, $3, $4, $5)',
+//               [req.user.user_id, packageJson.name, packageJson.version, req.user.username, readme]))
+//       .then(function() {
+//         // add the username for consistency
+//         packageJson.username = req.user.username;
+//         esClient.index({
+//           index: 'docs',
+//           type: 'doc',
+//           id: req.user.username + '/' + packageJson.name,
+//           body: packageJson
+//         }, function(err, response) {
+//           if (err) {
+//             // don't let this fail the request. we can run reindex jobs
+//             // nightly or something along those lines.
+//             console.log('failed to index package.json', err);
+//           }
+//         });
+//       })
+//       .then(function() {
+//         console.log('Checking for validators...', packageJson.validators)
+//         if (packageJson.validators) {
+//           packageJson.validators.forEach(function(validator) {
+//             clientQuery(req.pgClient, 'insert into cached_project_validations (userid, projectname, version, validationname, status) values ($1, $2, $3, $4, $5)',
+//                     [req.user.user_id, packageJson.name, packageJson.version, validator.name, 'RUNNING'])
+//               .then(function() {
+//                 http.request({
+//                   hostname: 'validator.deepkeep.co',
+//                   path: '/api/v0/validate?' + qs.stringify({
+//                     validator: validator.name,
+//                     project: req.user.username + '/' + packageJson.name,
+//                     callback: 'http://' + req.headers.host + '/private/api/v1/validated?' + qs.stringify({
+//                       userid: req.user.user_id,
+//                       projectName: packageJson.name,
+//                       version: packageJson.version,
+//                       validationname: validator.name
+//                     })
+//                   }),
+//                   method: 'POST'
+//                 }, function(res) {
+//                   console.log('Validate post result', res.statusCode);
+//                 }).end();
+//               }).catch(printError);
+//           });
+//         }
+//       })
+//       .then(function() {
+//         persistlog(req.pgClient, {
+//           type: 'upload-success',
+//           requestId: req.requestId,
+//           loggedInUserId: req.user.user_id,
+//           loggedInUsername: req.user.username,
+//           uploadFileKey: key,
+//           packageJson: packageJson
+//         });
+//       })
+//       .then(function() {
+//         req.pgCloseClient();
+//         res.json({
+//           status: 'success',
+//           path: '/' + req.user.username + '/' + packageJson.name + '/' + packageJson.version + '/package.zip'
+//         });
+//       })
+//   }).catch(next);
+// });
 
 app.post('/private/api/v1/validated', pgClient, function(req, res, next) {
   console.log('GOT VALIDATED', req.body);
@@ -323,6 +317,12 @@ app.post('/private/api/v1/validated', pgClient, function(req, res, next) {
 
 app.post('/private/api/v1/dockerevents', bodyParser.json({ type: 'application/vnd.docker.distribution.events.v1+json' }), function(req, res, next) {
   console.log('GOT DOCKER EVENT', req.query);
+  console.log(JSON.stringify(req.body));
+  res.send('OK');
+});
+
+app.post('/private/api/v1/packagesevent', bodyParser.json(), function(req, res, next) {
+  console.log('GOT PACKAGES REPO EVENT', req.query);
   console.log(JSON.stringify(req.body));
   res.send('OK');
 });
@@ -514,22 +514,6 @@ app.get('/:username/:project/package.zip', lookupPathUser, function(req, res, ne
 });
 
 app.get('/:username/:project/:version', lookupPathUser, renderProject);
-
-app.get('/:username/:project/:version/package.zip', lookupPathUser, function(req, res, next) {
-  var key = req.pathUser.user_id + '-' + req.params.project + '-' + req.params.version + '.zip';
-  persistlog(req.pgClient, {
-    type: 'download-package',
-    requestId: req.requestId,
-    loggedInUserHref: req.user ? user.href : null,
-    loggedInUsername: req.user ? user.username : null,
-    packageUsername: req.pathUser.username,
-    packageUserHref: req.pathUser.href,
-    packageProject: req.params.project,
-    packageVersion: req.params.version,
-  });
-  res.redirect(storage.urlForKey(key));
-  req.pgCloseClient();
-});
 
 app.use(function errorHandler(err, req, res, next) {
   if (err.type == 'user-error') {
