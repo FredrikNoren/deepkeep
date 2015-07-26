@@ -196,19 +196,19 @@ app.post('/private/api/v1/dockerevents', bodyParser.json({ type: 'application/vn
   res.send('OK');
 });
 
-app.post('/private/api/v1/packagesevent', bodyParser.json(), function(req, res, next) {
+app.post('/private/api/v1/packagesevent', pgClient, bodyParser.json(), function(req, res, next) {
   console.log('GOT PACKAGES REPO EVENT', req.query);
   console.log(JSON.stringify(req.body));
   clientQuery(req.pgClient, 'insert into cached_project_versions (userid, projectname, version, username, readme) values ($1, $2, $3, $4, $5)',
           [req.body.user_id, req.body.packageJson.name, req.body.packageJson.version, req.body.username, req.body.readme])
     .then(function() {
       // add the username for consistency
-      req.body.packageJson.username = req.user.username;
+      req.body.packageJson.username = req.body.username;
       esClient.index({
         index: 'docs',
         type: 'doc',
-        id: req.body.username + '/' + packageJson.name,
-        body: packageJson
+        id: req.body.username + '/' + req.body.packageJson.name,
+        body: req.body.packageJson
       }, function(err, response) {
         if (err) {
           // don't let this fail the request. we can run reindex jobs
@@ -218,21 +218,21 @@ app.post('/private/api/v1/packagesevent', bodyParser.json(), function(req, res, 
       });
     })
     .then(function() {
-      console.log('Checking for validators...', packageJson.validators)
-      if (packageJson.validators) {
-        packageJson.validators.forEach(function(validator) {
+      console.log('Checking for validators...', req.body.packageJson.validators)
+      if (req.body.packageJson.validators) {
+        req.body.packageJson.validators.forEach(function(validator) {
           clientQuery(req.pgClient, 'insert into cached_project_validations (userid, projectname, version, validationname, status) values ($1, $2, $3, $4, $5)',
-                  [req.body.user_id, packageJson.name, packageJson.version, validator.name, 'RUNNING'])
+                  [req.body.user_id, req.body.packageJson.name, req.body.packageJson.version, validator.name, 'RUNNING'])
             .then(function() {
               http.request({
                 hostname: 'validator.deepkeep.co',
                 path: '/api/v0/validate?' + qs.stringify({
                   validator: validator.name,
-                  project: req.body.username + '/' + packageJson.name,
+                  project: req.body.username + '/' + req.body.packageJson.name,
                   callback: 'http://' + req.headers.host + '/private/api/v1/validated?' + qs.stringify({
                     userid: req.body.user_id,
-                    projectName: packageJson.name,
-                    version: packageJson.version,
+                    projectName: req.body.packageJson.name,
+                    version: req.body.packageJson.version,
                     validationname: validator.name
                   })
                 }),
@@ -251,7 +251,7 @@ app.post('/private/api/v1/packagesevent', bodyParser.json(), function(req, res, 
         loggedInUserId: req.body.user_id,
         loggedInUsername: req.body.username,
         uploadFileKey: key,
-        packageJson: packageJson
+        packageJson: req.body.packageJson
       });
     })
     .then(function() {
