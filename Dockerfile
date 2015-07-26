@@ -1,10 +1,10 @@
 FROM node:0.12-onbuild
 
-COPY . /app
-
+ADD package.json /app/package.json
 WORKDIR /app
-
 RUN npm install
+
+ADD . /app
 
 EXPOSE 8095
 
