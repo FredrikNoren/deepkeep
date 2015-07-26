@@ -2,8 +2,10 @@ FROM node:0.12-onbuild
 
 COPY . /app
 
-RUN cd /app; npm install
+WORKDIR /app
+
+RUN npm install
 
 EXPOSE 8095
 
-CMD ["node", "/app/index.js"]
+CMD ["node", "index.js"]
