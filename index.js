@@ -544,6 +544,11 @@ app.use(function errorHandler(err, req, res, next) {
 });
 
 var port = process.env.PORT || 8095;
+if (typeof(port) === 'string') port = parseInt(port);
+if (typeof(port) !== 'number') {
+  console.log('Bad port: ', process.env.PORT);
+  process.exit(1);
+}
 app.listen(port, function() {
   console.log("Listening on " + port);
 });
