@@ -26,7 +26,7 @@ now is package and upload the network:
 ```bash
 zip package.1.0.zip package.json README.md network.t7
 curl -u USERNAME -F "package=@package.1.0.zip" \
-[[[host]]]/api/v1/upload
+[[[packages-host]]]/api/v1/upload
 ```
 
 And you're all done! The package can now be found on the website under

@@ -16,7 +16,7 @@ class Home extends React.Component {
     var badgeHtml = React.renderToStaticMarkup(<center><ValidatedBadge name="deepkeep/xor-validate" link="/deepkeep/xor-validate" score={0.65} /></center>);
 
     var markdownCustom = {
-      host: this.props.host,
+      'packages-host': this.props.packagesHost,
       'validated-badge': badgeHtml,
       'icon-get': '<i class="fa fa-download"></i>',
       'icon-host': '<i class="fa fa-cubes"></i>',

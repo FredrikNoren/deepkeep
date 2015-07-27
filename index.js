@@ -29,6 +29,8 @@ app.use(bodyParser.json());
 var DATABASE_URL = process.env.DATABASE_URL || 'postgres://localhost:5432/deepstack';
 console.log('Using postgres database: ', DATABASE_URL);
 
+var PUBLIC_PACKAGE_REPOSITORY_HOST = process.env.PUBLIC_PACKAGE_REPOSITORY_HOST;
+
 function runSQLFile(filename, callback) {
   var statements = fs.readFileSync(filename).toString().split(';');
   pg.connect(DATABASE_URL, function(err, client, closeClient) {
@@ -395,7 +397,7 @@ function renderProject(req, res, next) {
   data.content = {};
   data.content.username = req.params.username;
   data.content.project = req.params.project;
-  data.content.host = req.headers.host;
+  data.content.packagesHost = PUBLIC_PACKAGE_REPOSITORY_HOST;
 
   clientQuery(req.pgClient, 'select * from cached_project_versions where userid=$1 and projectname=$2 order by version desc',
           [req.pathUser.user_id, req.params.project])
