@@ -17,7 +17,7 @@ var React = require('react');
 require('node-jsx').install({extension: '.jsx', harmony: true });
 var PartialQuery = require('./server/partialquery');
 
-if (process.env.DEVELOP || !fs.existsSync('static/styles.css') || !fs.existsSync('static/bundle.js')) {
+if (process.env.BUILD_ON_RUN || !fs.existsSync('static/styles.css') || !fs.existsSync('static/bundle.js')) {
   require('./build.js'); // build static assets
 }
 
