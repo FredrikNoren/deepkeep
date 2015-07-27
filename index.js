@@ -30,6 +30,7 @@ var DATABASE_URL = process.env.DATABASE_URL || 'postgres://localhost:5432/deepst
 console.log('Using postgres database: ', DATABASE_URL);
 
 var PUBLIC_PACKAGE_REPOSITORY_HOST = process.env.PUBLIC_PACKAGE_REPOSITORY_HOST;
+console.log('Using packages host: ', PUBLIC_PACKAGE_REPOSITORY_HOST);
 
 function runSQLFile(filename, callback) {
   var statements = fs.readFileSync(filename).toString().split(';');
@@ -252,7 +253,7 @@ app.post('/private/api/v1/packagesevent', pgClient, bodyParser.json(), function(
         requestId: req.requestId,
         loggedInUserId: req.body.user_id,
         loggedInUsername: req.body.username,
-        uploadFileKey: key,
+        uploadFileUrl: req.body.url,
         packageJson: req.body.packageJson
       });
     })
@@ -283,7 +284,7 @@ app.get('/', function(req, res, next) {
   data.component = 'Home';
   data.content = {};
   data.content.isLoggedIn = !!req.user;
-  data.content.host = req.headers.host;
+  data.content.packagesHost = PUBLIC_PACKAGE_REPOSITORY_HOST;
   data.logoMuted = true;
 
   clientQuery(req.pgClient, queries.countAllProject.toQuery())

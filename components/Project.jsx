@@ -43,7 +43,7 @@ class Project extends React.Component {
           <div className={`${P}-sidebar-item`}>
             <b>Install</b>
             <div className={`${P}-install`}>
-              <input type="text" ref="installInput" value={`curl -LO ${this.props.packagesHost}/${this.props.username}/${this.props.project}/package.zip && unzip package.zip -d ${this.props.project} && rm package.zip`} readOnly/>
+              <input type="text" ref="installInput" value={`curl -LO ${this.props.packagesHost}/v1/${this.props.username}/${this.props.project}/${this.props.version}/package.zip && unzip package.zip -d ${this.props.project} && rm package.zip`} readOnly/>
               <a className={`${P}-copy`} onClick={this.copyInstall.bind(this)}>
                 <i className="fa fa-clipboard"/>
               </a>
