@@ -38,6 +38,9 @@ console.log('Using internal hostname:', INTERNAL_HOST);
 var VALIDATOR_HOST = process.env.VALIDATOR_HOST;
 console.log('Using validator host:', VALIDATOR_HOST);
 
+var ELASTICSEARCH_HOST = process.env.ELASTICSEARCH_HOST;
+console.log('Using elasticsearch host:', ELASTICSEARCH_HOST);
+
 function runSQLFile(filename, callback) {
   var statements = fs.readFileSync(filename).toString().split(';');
   pg.connect(DATABASE_URL, function(err, client, closeClient) {
@@ -102,7 +105,7 @@ app.get('/auth/callback',
   });
 
 var esClient = new elasticsearch.Client({
-  host: process.env.BONSAI_URL || 'localhost:9200'
+  host: ELASTICSEARCH_HOST
 });
 
 app.use(function requestLogger(req, res, next) {
