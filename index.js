@@ -423,7 +423,7 @@ function renderProject(req, res, next) {
       }
       data.content.readme = activeVersion.readme;
       data.content.version = activeVersion.version;
-      data.content.downloadPath = 'http://' + PUBLIC_PACKAGE_REPOSITORY_HOST '/v1/' + req.params.username + '/' + req.params.project + '/' + activeVersion.version + '/package.zip';
+      data.content.downloadPath = 'http://' + PUBLIC_PACKAGE_REPOSITORY_HOST + '/v1/' + req.params.username + '/' + req.params.project + '/' + activeVersion.version + '/package.zip';
 
 
       return clientQuery(req.pgClient, 'select * from cached_project_validations where userid=$1 and projectname=$2 and version=$3',
