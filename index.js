@@ -3,9 +3,7 @@ var express = require('express');
 var bodyParser = require('body-parser');
 var async = require('async');
 var moment = require('moment');
-var multer  = require('multer');
 var qs = require('querystring');
-var AdmZip = require('adm-zip');
 var http = require('http');
 var compression = require('compression');
 var request = require('request-promise');
@@ -13,16 +11,13 @@ var uuid = require('uuid');
 var pg = require('pg');
 var passport = require('passport');
 var Auth0Strategy = require('passport-auth0');
-var BasicStrategy = require('passport-http').BasicStrategy;
 var elasticsearch = require('elasticsearch');
 var Auth0 = require('auth0');
 var React = require('react');
 require('node-jsx').install({extension: '.jsx', harmony: true });
-var FSStorage = require('./server/fsstorage');
-var S3Storage = require('./server/s3storage');
 var PartialQuery = require('./server/partialquery');
 
-if (process.env.DEVELOP || !fs.existsSync('static/styles.css') || !fs.existsSync('static/bundle.js')) {
+if (process.env.BUILD_ON_RUN || !fs.existsSync('static/styles.css') || !fs.existsSync('static/bundle.js')) {
   require('./build.js'); // build static assets
 }
 
@@ -32,7 +27,16 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
 var DATABASE_URL = process.env.DATABASE_URL || 'postgres://localhost:5432/deepstack';
-console.log('Using postgres database: ', DATABASE_URL);
+console.log('Using postgres database:', DATABASE_URL);
+
+var PUBLIC_PACKAGE_REPOSITORY_HOST = process.env.PUBLIC_PACKAGE_REPOSITORY_HOST;
+console.log('Using packages host:', PUBLIC_PACKAGE_REPOSITORY_HOST);
+
+var INTERNAL_HOST = process.env.INTERNAL_HOST;
+console.log('Using internal hostname:', INTERNAL_HOST);
+
+var VALIDATOR_HOST = process.env.VALIDATOR_HOST;
+console.log('Using validator host:', VALIDATOR_HOST);
 
 function runSQLFile(filename, callback) {
   var statements = fs.readFileSync(filename).toString().split(';');
@@ -69,38 +73,6 @@ passport.use(new Auth0Strategy({
     profile.username = profile._json.username;
     return done(null, profile);
   }));
-
-passport.use(new BasicStrategy(
-  function(userid, password, done) {
-    request.post({
-      url: 'https://' + process.env.AUTH0_DOMAIN + '/oauth/ro',
-      json: {
-        client_id: process.env.AUTH0_CLIENT_ID,
-        username: userid,
-        password: password,
-        connection: 'Username-Password-Authentication',
-        grant_type: 'password',
-        scope: 'openid profile'
-      }
-    }).then(function(res) {
-      request.get({
-        url: 'https://' + process.env.AUTH0_DOMAIN + '/userinfo',
-        headers: {
-          Authorization: 'Bearer ' + res.access_token
-        }
-      }).then(function(account) {
-        done(null, JSON.parse(account));
-      }).catch(function(err) {
-        done(err);
-      });
-    }).catch(function(err) {
-      console.log('BasicStrategy login error', err);
-      if (!err) done({ error: 'unknown' });
-      else if (err.error.error == 'invalid_user_password') done(null, false);
-      else done(err.error);
-    });
-  }
-));
 
 // This is not a best practice, but we want to keep things simple for now
 passport.serializeUser(function(user, done) {
@@ -200,10 +172,6 @@ var queries = {};
 queries.allProjects = new PartialQuery('select userid, projectname, username from cached_project_versions group by userid, projectname, username');
 queries.countAllProject = new PartialQuery('select count(*) as nprojects from ($[allProjects]) as allprojects', { allProjects: queries.allProjects });
 
-var storage;
-if (process.env.AWS_ACCESS_KEY) storage = new S3Storage();
-else storage = new FSStorage(app);
-
 function persistlog(pgClient, data) {
   data.timestamp = Date.now();
   console.log('Persistent logging', data);
@@ -221,96 +189,6 @@ app.get('/favicon.ico', function(req, res) {
   res.sendfile('static/favicon.ico');
 });
 
-app.post('/api/v1/upload', pgClient, passport.authenticate('basic', { session: false }), multer({ dest: './uploads/' }), function(req, res, next) {
-  console.log(req.files);
-  console.log(req.user);
-  persistlog(req.pgClient, {
-    type: 'upload-attempt',
-    requestId: req.requestId
-  });
-
-  var zip = new AdmZip(req.files.package.path);
-  var packageJson = zip.readAsText('package.json');
-  var readme = zip.readAsText('README.md');
-  try {
-    packageJson = JSON.parse(packageJson);
-  } catch(err) {
-    res.status(400).send('Could not parse package.json');
-    return;
-  }
-  console.log(packageJson);
-  var body = fs.createReadStream(req.files.package.path);
-  var key = req.user.user_id + '-' + packageJson.name + '-' + packageJson.version + '.zip';
-  storage.exists(key).then(function(exists) {
-    if (exists) {
-      res.status(409).send('Package already extists at version ' + packageJson.version);
-      return;
-    }
-    return storage.upload(key, body)
-      .then(clientQuery(req.pgClient, 'insert into cached_project_versions (userid, projectname, version, username, readme) values ($1, $2, $3, $4, $5)',
-              [req.user.user_id, packageJson.name, packageJson.version, req.user.username, readme]))
-      .then(function() {
-        // add the username for consistency
-        packageJson.username = req.user.username;
-        esClient.index({
-          index: 'docs',
-          type: 'doc',
-          id: req.user.username + '/' + packageJson.name,
-          body: packageJson
-        }, function(err, response) {
-          if (err) {
-            // don't let this fail the request. we can run reindex jobs
-            // nightly or something along those lines.
-            console.log('failed to index package.json', err);
-          }
-        });
-      })
-      .then(function() {
-        console.log('Checking for validators...', packageJson.validators)
-        if (packageJson.validators) {
-          packageJson.validators.forEach(function(validator) {
-            clientQuery(req.pgClient, 'insert into cached_project_validations (userid, projectname, version, validationname, status) values ($1, $2, $3, $4, $5)',
-                    [req.user.user_id, packageJson.name, packageJson.version, validator.name, 'RUNNING'])
-              .then(function() {
-                http.request({
-                  hostname: 'validator.deepkeep.co',
-                  path: '/api/v0/validate?' + qs.stringify({
-                    validator: validator.name,
-                    project: req.user.username + '/' + packageJson.name,
-                    callback: 'http://' + req.headers.host + '/private/api/v1/validated?' + qs.stringify({
-                      userid: req.user.user_id,
-                      projectName: packageJson.name,
-                      version: packageJson.version,
-                      validationname: validator.name
-                    })
-                  }),
-                  method: 'POST'
-                }, function(res) {
-                  console.log('Validate post result', res.statusCode);
-                }).end();
-              }).catch(printError);
-          });
-        }
-      })
-      .then(function() {
-        persistlog(req.pgClient, {
-          type: 'upload-success',
-          requestId: req.requestId,
-          loggedInUserId: req.user.user_id,
-          loggedInUsername: req.user.username,
-          uploadFileKey: key,
-          packageJson: packageJson
-        });
-      })
-      .then(function() {
-        req.pgCloseClient();
-        res.json({
-          status: 'success',
-          path: '/' + req.user.username + '/' + packageJson.name + '/' + packageJson.version + '/package.zip'
-        });
-      })
-  }).catch(next);
-});
 
 app.post('/private/api/v1/validated', pgClient, function(req, res, next) {
   console.log('GOT VALIDATED', req.body);
@@ -325,6 +203,65 @@ app.post('/private/api/v1/dockerevents', bodyParser.json({ type: 'application/vn
   console.log('GOT DOCKER EVENT', req.query);
   console.log(JSON.stringify(req.body));
   res.send('OK');
+});
+
+function createPackageVersionPageFromData(pgClient, data) {
+  return clientQuery(pgClient, 'insert into cached_project_versions (userid, projectname, version, username, readme) values ($1, $2, $3, $4, $5)',
+          [data.user_id, data.packageJson.name, data.packageJson.version, data.username, data.readme])
+    .then(function() {
+      // add the username for consistency
+      data.packageJson.username = data.username;
+      esClient.index({
+        index: 'docs',
+        type: 'doc',
+        id: data.username + '/' + data.packageJson.name,
+        body: data.packageJson
+      }, function(err, response) {
+        if (err) {
+          // don't let this fail the request. we can run reindex jobs
+          // nightly or something along those lines.
+          console.log('failed to index package.json', err);
+        }
+      });
+    })
+    .then(function() {
+      console.log('Checking for validators...', data.packageJson.validators)
+      if (data.packageJson.validators) {
+        data.packageJson.validators.forEach(function(validator) {
+          clientQuery(pgClient, 'insert into cached_project_validations (userid, projectname, version, validationname, status) values ($1, $2, $3, $4, $5)',
+                  [data.user_id, data.packageJson.name, data.packageJson.version, validator.name, 'RUNNING'])
+            .then(function() {
+              http.request({
+                hostname: VALIDATOR_HOST,
+                path: '/api/v0/validate?' + qs.stringify({
+                  validator: validator.name,
+                  project: data.username + '/' + data.packageJson.name,
+                  callback: 'http://' + INTERNAL_HOST + '/private/api/v1/validated?' + qs.stringify({
+                    userid: data.user_id,
+                    projectName: data.packageJson.name,
+                    version: data.packageJson.version,
+                    validationname: validator.name
+                  })
+                }),
+                method: 'POST'
+              }, function(res) {
+                console.log('Validate post result', res.statusCode);
+              }).end();
+            }).catch(printError);
+        });
+      }
+    });
+}
+
+app.post('/private/api/v1/packagesevent', pgClient, bodyParser.json(), function(req, res, next) {
+  console.log('GOT PACKAGES REPO EVENT', req.query);
+  console.log(JSON.stringify(req.body));
+  createPackageVersionPageFromData(req.pgClient, req.body)
+    .then(function() {
+      req.pgCloseClient();
+      res.send('OK');
+    })
+    .catch(next);
 });
 
 // ---- PAGES -----
@@ -347,7 +284,7 @@ app.get('/', function(req, res, next) {
   data.component = 'Home';
   data.content = {};
   data.content.isLoggedIn = !!req.user;
-  data.content.host = req.headers.host;
+  data.content.packagesHost = PUBLIC_PACKAGE_REPOSITORY_HOST;
   data.logoMuted = true;
 
   clientQuery(req.pgClient, queries.countAllProject.toQuery())
@@ -461,7 +398,7 @@ function renderProject(req, res, next) {
   data.content = {};
   data.content.username = req.params.username;
   data.content.project = req.params.project;
-  data.content.host = req.headers.host;
+  data.content.packagesHost = PUBLIC_PACKAGE_REPOSITORY_HOST;
 
   clientQuery(req.pgClient, 'select * from cached_project_versions where userid=$1 and projectname=$2 order by version desc',
           [req.pathUser.user_id, req.params.project])
@@ -502,34 +439,7 @@ function renderProject(req, res, next) {
 
 app.get('/:username/:project', lookupPathUser, renderProject);
 
-app.get('/:username/:project/package.zip', lookupPathUser, function(req, res, next) {
-  clientQuery(req.pgClient, 'select * from cached_project_versions where userid=$1 and projectname=$2 order by version desc limit 1',
-          [req.pathUser.user_id, req.params.project])
-    .then(function(result) {
-      req.pgCloseClient();
-      res.redirect('/' + req.params.username + '/' + req.params.project + '/' + result.rows[0].version + '/package.zip');
-    }).catch(function() {
-      next({ type: 'user-error', message: 'Unknown project.' });
-    });
-});
-
 app.get('/:username/:project/:version', lookupPathUser, renderProject);
-
-app.get('/:username/:project/:version/package.zip', lookupPathUser, function(req, res, next) {
-  var key = req.pathUser.user_id + '-' + req.params.project + '-' + req.params.version + '.zip';
-  persistlog(req.pgClient, {
-    type: 'download-package',
-    requestId: req.requestId,
-    loggedInUserHref: req.user ? user.href : null,
-    loggedInUsername: req.user ? user.username : null,
-    packageUsername: req.pathUser.username,
-    packageUserHref: req.pathUser.href,
-    packageProject: req.params.project,
-    packageVersion: req.params.version,
-  });
-  res.redirect(storage.urlForKey(key));
-  req.pgCloseClient();
-});
 
 app.use(function errorHandler(err, req, res, next) {
   if (err.type == 'user-error') {
