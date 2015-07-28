@@ -27,10 +27,16 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
 var DATABASE_URL = process.env.DATABASE_URL || 'postgres://localhost:5432/deepstack';
-console.log('Using postgres database: ', DATABASE_URL);
+console.log('Using postgres database:', DATABASE_URL);
 
 var PUBLIC_PACKAGE_REPOSITORY_HOST = process.env.PUBLIC_PACKAGE_REPOSITORY_HOST;
-console.log('Using packages host: ', PUBLIC_PACKAGE_REPOSITORY_HOST);
+console.log('Using packages host:', PUBLIC_PACKAGE_REPOSITORY_HOST);
+
+var INTERNAL_HOST = process.env.INTERNAL_HOST;
+console.log('Using internal hostname:', INTERNAL_HOST);
+
+var VALIDATOR_HOST = process.env.VALIDATOR_HOST;
+console.log('Using validator host:', VALIDATOR_HOST);
 
 function runSQLFile(filename, callback) {
   var statements = fs.readFileSync(filename).toString().split(';');
@@ -199,19 +205,17 @@ app.post('/private/api/v1/dockerevents', bodyParser.json({ type: 'application/vn
   res.send('OK');
 });
 
-app.post('/private/api/v1/packagesevent', pgClient, bodyParser.json(), function(req, res, next) {
-  console.log('GOT PACKAGES REPO EVENT', req.query);
-  console.log(JSON.stringify(req.body));
-  clientQuery(req.pgClient, 'insert into cached_project_versions (userid, projectname, version, username, readme) values ($1, $2, $3, $4, $5)',
-          [req.body.user_id, req.body.packageJson.name, req.body.packageJson.version, req.body.username, req.body.readme])
+function createPackageVersionPageFromData(pgClient, data) {
+  return clientQuery(pgClient, 'insert into cached_project_versions (userid, projectname, version, username, readme) values ($1, $2, $3, $4, $5)',
+          [data.user_id, data.packageJson.name, data.packageJson.version, data.username, data.readme])
     .then(function() {
       // add the username for consistency
-      req.body.packageJson.username = req.body.username;
+      data.packageJson.username = data.username;
       esClient.index({
         index: 'docs',
         type: 'doc',
-        id: req.body.username + '/' + req.body.packageJson.name,
-        body: req.body.packageJson
+        id: data.username + '/' + data.packageJson.name,
+        body: data.packageJson
       }, function(err, response) {
         if (err) {
           // don't let this fail the request. we can run reindex jobs
@@ -221,21 +225,21 @@ app.post('/private/api/v1/packagesevent', pgClient, bodyParser.json(), function(
       });
     })
     .then(function() {
-      console.log('Checking for validators...', req.body.packageJson.validators)
-      if (req.body.packageJson.validators) {
-        req.body.packageJson.validators.forEach(function(validator) {
-          clientQuery(req.pgClient, 'insert into cached_project_validations (userid, projectname, version, validationname, status) values ($1, $2, $3, $4, $5)',
-                  [req.body.user_id, req.body.packageJson.name, req.body.packageJson.version, validator.name, 'RUNNING'])
+      console.log('Checking for validators...', data.packageJson.validators)
+      if (data.packageJson.validators) {
+        data.packageJson.validators.forEach(function(validator) {
+          clientQuery(pgClient, 'insert into cached_project_validations (userid, projectname, version, validationname, status) values ($1, $2, $3, $4, $5)',
+                  [data.user_id, data.packageJson.name, data.packageJson.version, validator.name, 'RUNNING'])
             .then(function() {
               http.request({
-                hostname: 'validator.deepkeep.co',
+                hostname: VALIDATOR_HOST,
                 path: '/api/v0/validate?' + qs.stringify({
                   validator: validator.name,
-                  project: req.body.username + '/' + req.body.packageJson.name,
-                  callback: 'http://' + req.headers.host + '/private/api/v1/validated?' + qs.stringify({
-                    userid: req.body.user_id,
-                    projectName: req.body.packageJson.name,
-                    version: req.body.packageJson.version,
+                  project: data.username + '/' + data.packageJson.name,
+                  callback: 'http://' + INTERNAL_HOST + '/private/api/v1/validated?' + qs.stringify({
+                    userid: data.user_id,
+                    projectName: data.packageJson.name,
+                    version: data.packageJson.version,
                     validationname: validator.name
                   })
                 }),
@@ -246,17 +250,13 @@ app.post('/private/api/v1/packagesevent', pgClient, bodyParser.json(), function(
             }).catch(printError);
         });
       }
-    })
-    .then(function() {
-      persistlog(req.pgClient, {
-        type: 'upload-success',
-        requestId: req.requestId,
-        loggedInUserId: req.body.user_id,
-        loggedInUsername: req.body.username,
-        uploadFileUrl: req.body.url,
-        packageJson: req.body.packageJson
-      });
-    })
+    });
+}
+
+app.post('/private/api/v1/packagesevent', pgClient, bodyParser.json(), function(req, res, next) {
+  console.log('GOT PACKAGES REPO EVENT', req.query);
+  console.log(JSON.stringify(req.body));
+  createPackageVersionPageFromData(req.pgClient, req.body)
     .then(function() {
       req.pgCloseClient();
       res.send('OK');
