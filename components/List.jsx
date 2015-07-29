@@ -8,7 +8,7 @@ class List extends React.Component {
     return <div className="container">
       <h5>{this.props.title}</h5>
       <ul>{this.props.projects.map(project => {
-        return <li key={project.url}><a href={project.url}>{project.username}/{project.projectname}</a></li>
+        return <li key={project.url}><a href={project.url}>{project.username}/{project.project}</a></li>
       })}</ul>
     </div>
   }
