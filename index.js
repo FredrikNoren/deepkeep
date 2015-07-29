@@ -121,6 +121,24 @@ app.get('/reset', function(req, res) {
   });
 });
 
+app.get('/reindex', function(req, res, next) {
+  request('http://' + PUBLIC_PACKAGE_REPOSITORY_HOST + '/v1/_all')
+    .then(function(packages) {
+      packages = JSON.parse(packages);
+      var r = packages.map(function(package) {
+        return request('http://' + PUBLIC_PACKAGE_REPOSITORY_HOST + '/v1/'
+          + package.username + '/' + package.package + '/' + package.version + '/package.zip/package.json')
+          .then(function(packageJson) {
+            esIndexPackage(package.username, JSON.parse(packageJson));
+          });
+      });
+      return Promise.all(r).then(function() {
+        res.send({ ok: true });
+      });
+    })
+    .catch(next);
+});
+
 function clientQuery(client, sql, params) {
   if (!client) throw new Error('client must be specified');
   return new Promise(function(resolve, reject) {
@@ -175,13 +193,6 @@ var queries = {};
 queries.allProjects = new PartialQuery('select userid, projectname, username from cached_project_versions group by userid, projectname, username');
 queries.countAllProject = new PartialQuery('select count(*) as nprojects from ($[allProjects]) as allprojects', { allProjects: queries.allProjects });
 
-function persistlog(pgClient, data) {
-  data.timestamp = Date.now();
-  console.log('Persistent logging', data);
-  clientQuery(pgClient, 'insert into logs (timestamp, data) values ($1, $2)',
-    [new Date(data.timestamp), data])
-    .catch(printError);
-}
 
 app.use(function createRequestId(req, res, next) {
   req.requestId = uuid.v1();
@@ -195,91 +206,59 @@ app.get('/favicon.ico', function(req, res) {
 
 app.post('/private/api/v1/validated', pgClient, function(req, res, next) {
   console.log('GOT VALIDATED', req.body);
-  clientQuery(req.pgClient, 'update cached_project_validations set status=$1 where userid=$2 and projectname=$3 and version=$4 and validationname=$5',
-          [req.body.score, req.query.userid, req.query.projectName, req.query.version, req.query.validationname])
+  clientQuery(req.pgClient, 'update validations set status=$1 where packageid=$2 and validationname=$3',
+          [req.body.score, req.query.packageid, req.query.validationname])
     .then(function() {
       res.json({ status: 'ok' });
     });
 });
 
-app.post('/private/api/v1/dockerevents', bodyParser.json({ type: 'application/vnd.docker.distribution.events.v1+json' }), function(req, res, next) {
-  console.log('GOT DOCKER EVENT', req.query);
-  console.log(JSON.stringify(req.body));
-  res.send('OK');
-});
-
-function createPackageVersionPageFromData(pgClient, data) {
-  return clientQuery(pgClient, 'insert into cached_project_versions (userid, projectname, version, username, readme) values ($1, $2, $3, $4, $5)',
-          [data.user_id, data.packageJson.name, data.packageJson.version, data.username, data.readme])
-    .then(function() {
-      // add the username for consistency
-      data.packageJson.username = data.username;
-      esClient.index({
-        index: 'docs',
-        type: 'doc',
-        id: data.username + '/' + data.packageJson.name,
-        body: data.packageJson
-      }, function(err, response) {
-        if (err) {
-          // don't let this fail the request. we can run reindex jobs
-          // nightly or something along those lines.
-          console.log('failed to index package.json', err);
-        }
-      });
-    })
-    .then(function() {
-      console.log('Checking for validators...', data.packageJson.validators)
-      if (data.packageJson.validators) {
-        data.packageJson.validators.forEach(function(validator) {
-          clientQuery(pgClient, 'insert into cached_project_validations (userid, projectname, version, validationname, status) values ($1, $2, $3, $4, $5)',
-                  [data.user_id, data.packageJson.name, data.packageJson.version, validator.name, 'RUNNING'])
-            .then(function() {
-              http.request({
-                hostname: VALIDATOR_HOST,
-                path: '/api/v0/validate?' + qs.stringify({
-                  validator: validator.name,
-                  project: data.username + '/' + data.packageJson.name,
-                  callback: 'http://' + INTERNAL_HOST + '/private/api/v1/validated?' + qs.stringify({
-                    userid: data.user_id,
-                    projectName: data.packageJson.name,
-                    version: data.packageJson.version,
-                    validationname: validator.name
-                  })
-                }),
-                method: 'POST'
-              }, function(res) {
-                console.log('Validate post result', res.statusCode);
-              }).end();
-            }).catch(printError);
-        });
-      }
-    });
+function esIndexPackage(username, packageJson) {
+  packageJson.username = username;
+  esClient.index({
+    index: 'docs',
+    type: 'doc',
+    id: username + '/' + packageJson.name,
+    body: packageJson
+  }, function(err, response) {
+    if (err) {
+      console.log('failed to index package.json', err);
+    }
+  });
 }
 
-app.post('/private/api/v1/packagesevent', pgClient, bodyParser.json(), function(req, res, next) {
+app.post('/private/api/v1/packagesevent', bodyParser.json(), function(req, res, next) {
   console.log('GOT PACKAGES REPO EVENT', req.query);
   console.log(JSON.stringify(req.body));
-  createPackageVersionPageFromData(req.pgClient, req.body)
-    .then(function() {
-      req.pgCloseClient();
-      res.send('OK');
-    })
-    .catch(next);
+  // Index package
+  esIndexPackage(req.body.username, req.body.packageJson);
+
+  // Validate
+  if (req.body.packageJson.validators) {
+    req.body.packageJson.validators.forEach(function(validator) {
+      clientQuery(pgClient, 'insert into validations (packageid, validationname, status) values ($1, $2, $3)',
+              [req.body.username + '/' + req.body.packageJson.name + '/' + req.body.packageJson.version, validator.name, 'RUNNING'])
+        .then(function() {
+          http.request({
+            hostname: VALIDATOR_HOST,
+            path: '/api/v0/validate?' + qs.stringify({
+              validator: validator.name,
+              project: req.body.username + '/' + req.body.packageJson.name,
+              callback: 'http://' + INTERNAL_HOST + '/private/api/v1/validated?' + qs.stringify({
+                packageid: req.body.username + '/' + req.body.packageJson.name + '/' + req.body.packageJson.version,
+                validationname: validator.name
+              })
+            }),
+            method: 'POST'
+          }, function(res) {
+            console.log('Validate post result', res.statusCode);
+          }).end();
+        }).catch(printError);
+    });
+  }
 });
 
 // ---- PAGES -----
-app.use(pgClient);
-app.use(function persistlogMiddleware(req, res, next) {
-  persistlog(req.pgClient, {
-    event: 'page-requested',
-    path: req.path,
-    method: req.method,
-    requestId: req.requestId,
-    loggedInUserHref: req.user ? req.user.href : null,
-    loggedInUsername: req.user ? req.user.username : null
-  });
-  next();
-});
 
 app.get('/', function(req, res, next) {
 
@@ -290,11 +269,14 @@ app.get('/', function(req, res, next) {
   data.content.packagesHost = PUBLIC_PACKAGE_REPOSITORY_HOST;
   data.logoMuted = true;
 
-  clientQuery(req.pgClient, queries.countAllProject.toQuery())
-    .then(function(result) {
-      data.content.nprojects = result.rows[0].nprojects;
+  request('http://' + PUBLIC_PACKAGE_REPOSITORY_HOST + '/v1/_packagescount')
+    .then(function(res) {
+      res = JSON.parse(res);
+      console.log('RESUULT', res, res.count)
+      data.content.nprojects = res.count;
       next();
-    }).catch(next);
+    })
+    .catch(next);
 }, renderPage);
 
 app.get('/all', function(req, res, next) {
@@ -305,14 +287,16 @@ app.get('/all', function(req, res, next) {
   data.content.isLoggedIn = !!req.user;
   data.content.title = 'All Projects';
 
-  clientQuery(req.pgClient, queries.allProjects.toQuery())
-    .then(function(result) {
-      data.content.projects = result.rows.map(function(project) {
-        project.url = '/' + project.username + '/' + project.projectname;
+  request('http://' + PUBLIC_PACKAGE_REPOSITORY_HOST + '/v1/_packages')
+    .then(function(projects) {
+      projects = JSON.parse(projects);
+      data.content.projects = projects.map(function(project) {
+        project.url = '/' + project.username + '/' + project.package;
         return project;
       });
       next();
-    }).catch(next);
+    })
+    .catch(next);
 }, renderPage);
 
 app.get('/search', function(req, res, next) {
@@ -382,17 +366,16 @@ app.get('/:username', lookupPathUser, function(req, res, next) {
   data.content = {};
   data.content.username = req.params.username;
 
-  clientQuery(req.pgClient, 'select projectname from cached_project_versions where userid=$1 group by projectname',
-          [req.pathUser.user_id])
-    .then(function(result) {
-      req.pgCloseClient();
-      console.log('Insert res', result);
-      data.content.projects = result.rows.map(function(project) {
-        project.url = '/' + req.pathUser.username + '/' + project.projectname;
+  request('http://' + PUBLIC_PACKAGE_REPOSITORY_HOST + '/v1/' + encodeURIComponent(req.pathUser.username) + '/_packages')
+    .then(function(projects) {
+      projects = JSON.parse(projects);
+      data.content.projects = projects.map(function(project) {
+        project.url = '/' + project.username + '/' + project.package;
         return project;
       });
       next();
-    }).catch(next);
+    })
+    .catch(next);
 }, renderPage);
 
 function renderProject(req, res, next) {
@@ -403,46 +386,40 @@ function renderProject(req, res, next) {
   data.content.project = req.params.project;
   data.content.packagesHost = PUBLIC_PACKAGE_REPOSITORY_HOST;
 
-  clientQuery(req.pgClient, 'select * from cached_project_versions where userid=$1 and projectname=$2 order by version desc',
-          [req.pathUser.user_id, req.params.project])
-    .then(function(result) {
-      req.pgCloseClient();
-      //console.log('Insert res', result);
-      data.content.versions = result.rows.map(function(project) {
+  var packageUrl = 'http://' + PUBLIC_PACKAGE_REPOSITORY_HOST + '/v1/' + encodeURIComponent(req.params.username) + '/' + encodeURIComponent(req.params.project);
+
+  request(packageUrl + '/_versions')
+    .then(function(versions) {
+      versions = JSON.parse(versions);
+      data.content.versions = versions.map(function(version) {
         return {
-          name: project.version,
-          url: '/' + req.params.username + '/' + req.params.project + '/' + project.version
+          name: version.version,
+          url: '/' + version.username + '/' + version.package + '/' + version.version
         }
       });
-      if (req.params.version) {
-        var activeVersion = result.rows.filter(function(project) {
-          return project.version == req.params.version;
-        })[0];
-        if (!activeVersion) {
-          throw new Error('No such version');
-        }
-      } else {
-        var activeVersion = result.rows[0];
-      }
-      data.content.readme = activeVersion.readme;
-      data.content.version = activeVersion.version;
-      data.content.downloadPath = 'http://' + PUBLIC_PACKAGE_REPOSITORY_HOST + '/v1/' + req.params.username + '/' + req.params.project + '/' + activeVersion.version + '/package.zip';
+      data.content.version = req.params.version || versions[0].version;
+    })
+    .then(function() {
+      return request(packageUrl + '/' + data.content.version + '/package.zip/README.md')
+        .then(function(readme) {
+          data.content.readme = readme;
+        });
+    })
+    .then(function() {
+      data.content.downloadPath = packageUrl + '/' + data.content.version + '/package.zip';
 
-
-      return clientQuery(req.pgClient, 'select * from cached_project_validations where userid=$1 and projectname=$2 and version=$3',
-        [req.pathUser.user_id, req.params.project, data.content.version])
+      return clientQuery(req.pgClient, 'select * from validations where packageid=$1',
+        [req.pathUser.username + '/' + req.params.project + '/' + data.content.version])
         .then(function(validations) {
           data.content.validations = validations.rows;
           renderPage(req, res);
         });
-    }).catch(function() {
-      next({ type: 'user-error', message: 'Unknown project.' });
     });
 }
 
-app.get('/:username/:project', lookupPathUser, renderProject);
+app.get('/:username/:project', pgClient, lookupPathUser, renderProject);
 
-app.get('/:username/:project/:version', lookupPathUser, renderProject);
+app.get('/:username/:project/:version', pgClient, lookupPathUser, renderProject);
 
 app.use(function errorHandler(err, req, res, next) {
   if (err.type == 'user-error') {

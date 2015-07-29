@@ -7,8 +7,8 @@ class List extends React.Component {
   render() {
     return <div className="container">
       <h5>{this.props.title}</h5>
-      <ul>{this.props.projects.map(project => {
-        return <li key={project.url}><a href={project.url}>{project.username}/{project.projectname}</a></li>
+      <ul>{this.props.projects.map(item => {
+        return <li key={item.url}><a href={item.url}>{item.username}/{item.package}</a></li>
       })}</ul>
     </div>
   }

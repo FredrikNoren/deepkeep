@@ -11,8 +11,8 @@ class User extends React.Component {
         <a href={'/' + this.props.username} className={`${P}-username`}>{this.props.username}</a>
       </p>
       <b>Projects</b>
-      <ul>{this.props.projects.map(project => {
-        return <li><a href={project.url}>{project.projectname}</a></li>
+      <ul>{this.props.projects.map(item => {
+        return <li><a href={item.url}>{item.package}</a></li>
       })}</ul>
     </section>)
   }
