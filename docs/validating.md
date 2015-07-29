@@ -6,7 +6,7 @@ page:
 [[[validated-badge]]]
 
 All you have to do is add which validators you want to run on it in the
-`package.json`.
+`package.json`, together with the validation data you want to use.
 
 ```json
 {
@@ -14,11 +14,13 @@ All you have to do is add which validators you want to run on it in the
   "version": "1.0",
   "validators": [
     {
-      "name": "deepkeep/xor-validate"
+      "name": "deepkeep/torch-validator",
+      "packages": {
+        "validation-data": "deepkeep/xor-validation-data"
+      }
     }
   ]
 }
 ```
 
-You can also write your own validators. See
-[xor validate](https://github.com/deepkeep/xor-validate) for an example.
+This one is using the [torch validator](https://github.com/deepkeep/torch-validator).
