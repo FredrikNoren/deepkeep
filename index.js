@@ -198,7 +198,7 @@ app.post('/private/api/v1/validated', pgClient, function(req, res, next) {
 app.post('/private/api/v1/packagesevent', bodyParser.json(), function(req, res, next) {
   console.log('GOT PACKAGES REPO EVENT', req.query);
   console.log(JSON.stringify(req.body));
-  // add the username for consistency
+  // Index package
   data.packageJson.username = req.body.username;
   esClient.index({
     index: 'docs',
@@ -210,6 +210,32 @@ app.post('/private/api/v1/packagesevent', bodyParser.json(), function(req, res, 
       console.log('failed to index package.json', err);
     }
   });
+
+  // Validate
+  if (req.body.packageJson.validators) {
+    req.body.packageJson.validators.forEach(function(validator) {
+      clientQuery(pgClient, 'insert into validations (packageid, validationname, status) values ($1, $2, $3)',
+              [req.body.username + '/' + req.body.packageJson.name + '/' + req.body.packageJson.version, validator.name, 'RUNNING'])
+        .then(function() {
+          http.request({
+            hostname: VALIDATOR_HOST,
+            path: '/api/v0/validate?' + qs.stringify({
+              validator: validator.name,
+              project: req.body.username + '/' + req.body.packageJson.name,
+              callback: 'http://' + INTERNAL_HOST + '/private/api/v1/validated?' + qs.stringify({
+                userid: req.body.user_id,
+                projectName: req.body.packageJson.name,
+                version: req.body.packageJson.version,
+                validationname: validator.name
+              })
+            }),
+            method: 'POST'
+          }, function(res) {
+            console.log('Validate post result', res.statusCode);
+          }).end();
+        }).catch(printError);
+    });
+  }
 });
 
 // ---- PAGES -----
