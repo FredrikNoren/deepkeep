@@ -188,8 +188,8 @@ app.get('/favicon.ico', function(req, res) {
 
 app.post('/private/api/v1/validated', pgClient, function(req, res, next) {
   console.log('GOT VALIDATED', req.body);
-  clientQuery(req.pgClient, 'update package_validations set status=$1 where packagevid=$2 and validationname=$3',
-          [req.body.score, req.query.packagevid, req.query.validationname])
+  clientQuery(req.pgClient, 'update validations set status=$1 where packageid=$2 and validationname=$3',
+          [req.body.score, req.query.packageid, req.query.validationname])
     .then(function() {
       res.json({ status: 'ok' });
     });
@@ -223,9 +223,7 @@ app.post('/private/api/v1/packagesevent', bodyParser.json(), function(req, res, 
               validator: validator.name,
               project: req.body.username + '/' + req.body.packageJson.name,
               callback: 'http://' + INTERNAL_HOST + '/private/api/v1/validated?' + qs.stringify({
-                userid: req.body.user_id,
-                projectName: req.body.packageJson.name,
-                version: req.body.packageJson.version,
+                packageid: req.body.username + '/' + req.body.packageJson.name + '/' + req.body.packageJson.version,
                 validationname: validator.name
               })
             }),
