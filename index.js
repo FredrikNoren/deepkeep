@@ -320,18 +320,17 @@ app.get('/:username', lookupPathUser, function(req, res, next) {
   data.component = 'User';
   data.content = {};
   data.content.username = req.params.username;
-
-  clientQuery(req.pgClient, 'select projectname from cached_project_versions where userid=$1 group by projectname',
-          [req.pathUser.user_id])
-    .then(function(result) {
-      req.pgCloseClient();
-      console.log('Insert res', result);
-      data.content.projects = result.rows.map(function(project) {
-        project.url = '/' + req.pathUser.username + '/' + project.projectname;
+  
+  request('http://' + PUBLIC_PACKAGE_REPOSITORY_HOST + '/v1/' + encodeURIComponent(req.pathUser.username) + '/_projects')
+    .then(function(projects) {
+      projects = JSON.parse(projects);
+      data.content.projects = projects.map(function(project) {
+        project.url = '/' + project.username + '/' + project.project;
         return project;
       });
       next();
-    }).catch(next);
+    })
+    .catch(next);
 }, renderPage);
 
 function renderProject(req, res, next) {

@@ -12,7 +12,7 @@ class User extends React.Component {
       </p>
       <b>Projects</b>
       <ul>{this.props.projects.map(project => {
-        return <li><a href={project.url}>{project.projectname}</a></li>
+        return <li><a href={project.url}>{project.project}</a></li>
       })}</ul>
     </section>)
   }
