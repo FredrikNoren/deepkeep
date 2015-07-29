@@ -352,7 +352,7 @@ function renderProject(req, res, next) {
           url: '/' + version.username + '/' + version.package + '/' + version.version
         }
       });
-      data.content.version = req.params.version || data.content.versions[0].version;
+      data.content.version = req.params.version || versions[0].version;
     })
     .then(function() {
       return request(packageUrl + '/' + data.content.version + '/package.zip/README.md')
