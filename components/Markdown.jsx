@@ -25,7 +25,7 @@ class Markdown extends React.Component {
         html = html.replace('[[[' + key + ']]]', this.props.custom[key]);
       });
     }
-    return <div dangerouslySetInnerHTML={{ __html: html }} />
+    return <div className="markdown" dangerouslySetInnerHTML={{ __html: html }} />
   }
 }
 
