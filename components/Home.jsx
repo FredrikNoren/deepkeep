@@ -6,6 +6,7 @@ var ValidatedBadge = require('./ValidatedBadge.jsx');
 
 var P = 'home'; // style class name prefix
 
+var gettingStartedDoc = fs.readFileSync('docs/getting-started.md', 'utf8');
 var uploadingDoc = fs.readFileSync('docs/uploading.md', 'utf8');
 var usingDoc = fs.readFileSync('docs/using.md', 'utf8');
 var validatingDoc = fs.readFileSync('docs/validating.md', 'utf8');
@@ -18,6 +19,7 @@ class Home extends React.Component {
     var markdownCustom = {
       'packages-host': this.props.packagesHost,
       'validated-badge': badgeHtml,
+      'icon-getting-started': '<i class="fa fa-coffee"></i>',
       'icon-get': '<i class="fa fa-download"></i>',
       'icon-host': '<i class="fa fa-cubes"></i>',
       'icon-validate': '<i class="fa fa-check-circle-o"></i>',
@@ -86,22 +88,11 @@ class Home extends React.Component {
             </div>
           </div>
         </div>
-        <div className="row">
-          <div className="six columns">
+        <div className={`${P}-docs`}>
+            <Markdown doc={gettingStartedDoc} custom={markdownCustom} />
             <Markdown doc={usingDoc} custom={markdownCustom} />
-          </div>
-
-          <div className="six columns">
             <Markdown doc={uploadingDoc} custom={markdownCustom} />
-          </div>
-        </div>
-        <div className="row">
-          <div className="six columns">
             <Markdown doc={validatingDoc} custom={markdownCustom} />
-          </div>
-
-          <div className="six columns">
-          </div>
         </div>
 
       </div>
@@ -198,6 +189,14 @@ Home.styles = `
     font-size: 17px;
     margin-bottom: 14px;
     font-family: 'Open sans';
+  }
+  .${P}-docs {
+    -webkit-column-count: 2;
+    -moz-column-count: 2;
+    column-count: 2;
+    .markdown {
+      display: inline-block;
+    }
   }
   .${P}-tutorial {
     margin-bottom: 100px;

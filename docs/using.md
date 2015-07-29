@@ -3,9 +3,7 @@ We'll use a packaged [torch](http://torch.ch) network that computes xor as an
 example. Start by downloading and extracting the network:
 
 ```bash
-curl -LO [[[packages-host]]]/v1/deepkeep/xor/package.zip
-unzip package.zip -d xor
-rm package.zip
+deepkeep install deepkeep/xor
 ```
 
 Then create a file called `test.lua` and add the following to it:
