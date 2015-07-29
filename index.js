@@ -121,6 +121,24 @@ app.get('/reset', function(req, res) {
   });
 });
 
+app.get('/reindex', function(req, res, next) {
+  request('http://' + PUBLIC_PACKAGE_REPOSITORY_HOST + '/v1/_all')
+    .then(function(packages) {
+      packages = JSON.parse(packages);
+      var r = packages.map(function(package) {
+        return request('http://' + PUBLIC_PACKAGE_REPOSITORY_HOST + '/v1/'
+          + package.username + '/' + package.package + '/' + package.version + '/package.zip/package.json')
+          .then(function(packageJson) {
+            esIndexPackage(package.username, JSON.parse(packageJson));
+          });
+      });
+      return Promise.all(r).then(function() {
+        res.send({ ok: true });
+      });
+    })
+    .catch(next);
+});
+
 function clientQuery(client, sql, params) {
   if (!client) throw new Error('client must be specified');
   return new Promise(function(resolve, reject) {
@@ -195,21 +213,25 @@ app.post('/private/api/v1/validated', pgClient, function(req, res, next) {
     });
 });
 
-app.post('/private/api/v1/packagesevent', bodyParser.json(), function(req, res, next) {
-  console.log('GOT PACKAGES REPO EVENT', req.query);
-  console.log(JSON.stringify(req.body));
-  // Index package
-  data.packageJson.username = req.body.username;
+function esIndexPackage(username, packageJson) {
+  packageJson.username = username;
   esClient.index({
     index: 'docs',
     type: 'doc',
-    id: req.body.username + '/' + req.body.packageJson.name,
-    body: req.body.packageJson
+    id: username + '/' + packageJson.name,
+    body: packageJson
   }, function(err, response) {
     if (err) {
       console.log('failed to index package.json', err);
     }
   });
+}
+
+app.post('/private/api/v1/packagesevent', bodyParser.json(), function(req, res, next) {
+  console.log('GOT PACKAGES REPO EVENT', req.query);
+  console.log(JSON.stringify(req.body));
+  // Index package
+  esIndexPackage(req.body.username, req.body.packageJson);
 
   // Validate
   if (req.body.packageJson.validators) {
