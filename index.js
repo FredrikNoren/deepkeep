@@ -224,7 +224,7 @@ app.get('/', function(req, res, next) {
   data.content.packagesHost = PUBLIC_PACKAGE_REPOSITORY_HOST;
   data.logoMuted = true;
 
-  request('http://' + PUBLIC_PACKAGE_REPOSITORY_HOST + '/v1/_projects/count')
+  request('http://' + PUBLIC_PACKAGE_REPOSITORY_HOST + '/v1/_packagescount')
     .then(function(res) {
       res = JSON.parse(res);
       console.log('RESUULT', res, res.count)
@@ -242,11 +242,11 @@ app.get('/all', function(req, res, next) {
   data.content.isLoggedIn = !!req.user;
   data.content.title = 'All Projects';
 
-  request('http://' + PUBLIC_PACKAGE_REPOSITORY_HOST + '/v1/_projects')
+  request('http://' + PUBLIC_PACKAGE_REPOSITORY_HOST + '/v1/_packages')
     .then(function(projects) {
       projects = JSON.parse(projects);
       data.content.projects = projects.map(function(project) {
-        project.url = '/' + project.username + '/' + project.project;
+        project.url = '/' + project.username + '/' + project.package;
         return project;
       });
       next();
@@ -320,12 +320,12 @@ app.get('/:username', lookupPathUser, function(req, res, next) {
   data.component = 'User';
   data.content = {};
   data.content.username = req.params.username;
-  
-  request('http://' + PUBLIC_PACKAGE_REPOSITORY_HOST + '/v1/' + encodeURIComponent(req.pathUser.username) + '/_projects')
+
+  request('http://' + PUBLIC_PACKAGE_REPOSITORY_HOST + '/v1/' + encodeURIComponent(req.pathUser.username) + '/_packages')
     .then(function(projects) {
       projects = JSON.parse(projects);
       data.content.projects = projects.map(function(project) {
-        project.url = '/' + project.username + '/' + project.project;
+        project.url = '/' + project.username + '/' + project.package;
         return project;
       });
       next();
@@ -341,40 +341,34 @@ function renderProject(req, res, next) {
   data.content.project = req.params.project;
   data.content.packagesHost = PUBLIC_PACKAGE_REPOSITORY_HOST;
 
-  clientQuery(req.pgClient, 'select * from cached_project_versions where userid=$1 and projectname=$2 order by version desc',
-          [req.pathUser.user_id, req.params.project])
-    .then(function(result) {
-      req.pgCloseClient();
-      //console.log('Insert res', result);
-      data.content.versions = result.rows.map(function(project) {
+  var packageUrl = 'http://' + PUBLIC_PACKAGE_REPOSITORY_HOST + '/v1/' + encodeURIComponent(req.params.username) + '/' + encodeURIComponent(req.params.project);
+
+  request(packageUrl + '/_versions')
+    .then(function(versions) {
+      versions = JSON.parse(versions);
+      data.content.versions = versions.map(function(version) {
         return {
-          name: project.version,
-          url: '/' + req.params.username + '/' + req.params.project + '/' + project.version
+          name: version.version,
+          url: '/' + version.username + '/' + version.package + '/' + version.version
         }
       });
-      if (req.params.version) {
-        var activeVersion = result.rows.filter(function(project) {
-          return project.version == req.params.version;
-        })[0];
-        if (!activeVersion) {
-          throw new Error('No such version');
-        }
-      } else {
-        var activeVersion = result.rows[0];
-      }
-      data.content.readme = activeVersion.readme;
-      data.content.version = activeVersion.version;
-      data.content.downloadPath = 'http://' + PUBLIC_PACKAGE_REPOSITORY_HOST + '/v1/' + req.params.username + '/' + req.params.project + '/' + activeVersion.version + '/package.zip';
+      data.content.version = req.params.version || data.content.versions[0].version;
+    })
+    .then(function() {
+      return request(packageUrl + '/' + data.content.version + '/package.zip/README.md')
+        .then(function(readme) {
+          data.content.readme = readme;
+        });
+    })
+    .then(function() {
+      data.content.downloadPath = packageUrl + '/' + data.content.version + '/package.zip';
 
-
-      return clientQuery(req.pgClient, 'select * from cached_project_validations where userid=$1 and projectname=$2 and version=$3',
-        [req.pathUser.user_id, req.params.project, data.content.version])
+      return clientQuery(req.pgClient, 'select * from validations where packageid=$1',
+        [req.pathUser.username + '/' + req.params.project + '/' + data.content.version])
         .then(function(validations) {
           data.content.validations = validations.rows;
           renderPage(req, res);
         });
-    }).catch(function() {
-      next({ type: 'user-error', message: 'Unknown project.' });
     });
 }
 
