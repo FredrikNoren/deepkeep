@@ -213,7 +213,6 @@ app.post('/private/api/v1/packagesevent', bodyParser.json(), function(req, res, 
 });
 
 // ---- PAGES -----
-app.use(pgClient);
 
 app.get('/', function(req, res, next) {
 
@@ -372,9 +371,9 @@ function renderProject(req, res, next) {
     });
 }
 
-app.get('/:username/:project', lookupPathUser, renderProject);
+app.get('/:username/:project', pgClient, lookupPathUser, renderProject);
 
-app.get('/:username/:project/:version', lookupPathUser, renderProject);
+app.get('/:username/:project/:version', pgClient, lookupPathUser, renderProject);
 
 app.use(function errorHandler(err, req, res, next) {
   if (err.type == 'user-error') {
