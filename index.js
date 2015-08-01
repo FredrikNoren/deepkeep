@@ -205,9 +205,19 @@ app.get('/favicon.ico', function(req, res) {
 
 
 app.post('/private/api/v1/validated', pgClient, function(req, res, next) {
-  console.log('GOT VALIDATED', req.body);
-  clientQuery(req.pgClient, 'update validations set status=$1 where packageid=$2 and validationname=$3',
-          [req.body.score, req.query.packageid, req.query.validationname])
+  console.log('GOT VALIDATED', req.body, req.query.packageid);
+
+  var updates = req.body.scores
+    .map(function(s) {
+      if (!s.hasOwnProperty('score')) s.score = 'failed';
+      return clientQuery(
+        req.pgClient,
+        'update validations set status=$1 where packageid=$2 and validationname=$3',
+        [''+s.score, req.query.packageid, s.name]
+      );
+    });
+
+  Promise.all(updates)
     .then(function() {
       res.json({ status: 'ok' });
     });
@@ -227,7 +237,7 @@ function esIndexPackage(username, packageJson) {
   });
 }
 
-app.post('/private/api/v1/packagesevent', bodyParser.json(), function(req, res, next) {
+app.post('/private/api/v1/packagesevent', bodyParser.json(), pgClient, function(req, res, next) {
   console.log('GOT PACKAGES REPO EVENT', req.query);
   console.log(JSON.stringify(req.body));
   // Index package
@@ -235,26 +245,31 @@ app.post('/private/api/v1/packagesevent', bodyParser.json(), function(req, res, 
 
   // Validate
   if (req.body.packageJson.validators) {
-    req.body.packageJson.validators.forEach(function(validator) {
-      clientQuery(pgClient, 'insert into validations (packageid, validationname, status) values ($1, $2, $3)',
-              [req.body.username + '/' + req.body.packageJson.name + '/' + req.body.packageJson.version, validator.name, 'RUNNING'])
-        .then(function() {
-          http.request({
-            hostname: VALIDATOR_HOST,
-            path: '/api/v0/validate?' + qs.stringify({
-              validator: validator.name,
-              project: req.body.username + '/' + req.body.packageJson.name,
-              callback: 'http://' + INTERNAL_HOST + '/private/api/v1/validated?' + qs.stringify({
-                packageid: req.body.username + '/' + req.body.packageJson.name + '/' + req.body.packageJson.version,
-                validationname: validator.name
-              })
-            }),
-            method: 'POST'
-          }, function(res) {
-            console.log('Validate post result', res.statusCode);
-          }).end();
-        }).catch(printError);
-    });
+    var packageid = req.body.username + '/' + req.body.packageJson.name + '/' + req.body.packageJson.version;
+
+    var inserts = req.body.packageJson.validators
+      .map(function(v) {
+        return clientQuery(
+          req.pgClient,
+          'insert into validations (packageid, validationname, status) values ($1, $2, $3)',
+          [packageid, v.name, 'RUNNING']
+        );
+      });
+
+    Promise.all(inserts)
+      .then(function() {
+        var url = 'http://' + VALIDATOR_HOST + '/api/v0/validate?' + qs.stringify({
+          project: packageid,
+          callback: 'http://' + INTERNAL_HOST + '/private/api/v1/validated?' + qs.stringify({
+            packageid: packageid
+          })
+        });
+        return request.post(url);
+      })
+      .then(function(res) {
+        console.log('Validate post result', res.statusCode);
+      })
+      .catch(printError);
   }
 });
 
@@ -272,7 +287,7 @@ app.get('/', function(req, res, next) {
   request('http://' + PUBLIC_PACKAGE_REPOSITORY_HOST + '/v1/_packagescount')
     .then(function(res) {
       res = JSON.parse(res);
-      console.log('RESUULT', res, res.count)
+      console.log('RESULT', res, res.count)
       data.content.nprojects = res.count;
       next();
     })
@@ -408,8 +423,9 @@ function renderProject(req, res, next) {
     .then(function() {
       data.content.downloadPath = packageUrl + '/' + data.content.version + '/package.zip';
 
+      var packageid = req.pathUser.username + '/' + req.params.project + '/' + data.content.version;
       return clientQuery(req.pgClient, 'select * from validations where packageid=$1',
-        [req.pathUser.username + '/' + req.params.project + '/' + data.content.version])
+        [packageid])
         .then(function(validations) {
           data.content.validations = validations.rows;
           renderPage(req, res);
