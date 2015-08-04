@@ -404,6 +404,7 @@ function renderProject(req, res, next) {
   request(packageUrl + '/_versions')
     .then(function(versions) {
       versions = JSON.parse(versions);
+      versions.reverse();
       data.content.versions = versions.map(function(version) {
         return {
           name: version.version,
