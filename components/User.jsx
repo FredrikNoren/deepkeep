@@ -10,8 +10,8 @@ class User extends React.Component {
         <i className="fa fa-user"></i>
         <a href={'/' + this.props.username} className={`${P}-username`}>{this.props.username}</a>
       </p>
-      <b>Projects</b>
-      <ul>{this.props.projects.map(item => {
+      <b>Packages</b>
+      <ul>{this.props.packages.map(item => {
         return <li><a href={item.url}>{item.package}</a></li>
       })}</ul>
     </section>)

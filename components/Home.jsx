@@ -31,7 +31,7 @@ class Home extends React.Component {
     <div className="logo">deep<span className="logo-stack">keep</span></div>
     <div className={`${P}-subtitle`}>The Neural Networks Repository</div>
     <div className={`${P}-nprojects`}>
-      <a href="/all">{this.props.nprojects} projects available so far</a>
+      <a href="/all">{this.props.npackages} packages available so far</a>
     </div>
   </div>
 

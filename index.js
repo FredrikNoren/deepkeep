@@ -195,9 +195,6 @@ function renderPage(req, res) {
 }
 
 var queries = {};
-queries.allProjects = new PartialQuery('select userid, projectname, username from cached_project_versions group by userid, projectname, username');
-queries.countAllProject = new PartialQuery('select count(*) as nprojects from ($[allProjects]) as allprojects', { allProjects: queries.allProjects });
-
 
 app.use(function createRequestId(req, res, next) {
   req.requestId = uuid.v1();
@@ -293,7 +290,7 @@ app.get('/', function(req, res, next) {
     .then(function(res) {
       res = JSON.parse(res);
       console.log('RESULT', res, res.count)
-      data.content.nprojects = res.count;
+      data.content.npackages = res.count;
       next();
     })
     .catch(next);
@@ -305,14 +302,14 @@ app.get('/all', function(req, res, next) {
   data.component = 'List';
   data.content = {};
   data.content.isLoggedIn = !!req.user;
-  data.content.title = 'All Projects';
+  data.content.title = 'All Packages';
 
   request('http://' + PUBLIC_PACKAGE_REPOSITORY_HOST + '/v1/_packages')
-    .then(function(projects) {
-      projects = JSON.parse(projects);
-      data.content.projects = projects.map(function(project) {
-        project.url = '/' + project.username + '/' + project.package;
-        return project;
+    .then(function(packages) {
+      packages = JSON.parse(packages);
+      data.content.packages = packages.map(function(package) {
+        package.url = '/' + package.username + '/' + package.package;
+        return package;
       });
       next();
     })
@@ -345,11 +342,11 @@ app.get('/search', function(req, res, next) {
       'matching',
       req.query.q
     ].join(' ');
-    data.content.projects = result.hits.hits.map(function(hit) {
-      var project = hit._source;
-      project.projectname = project.name;
-      project.url = '/' + project.username + '/' + project.name;
-      return project;
+    data.content.packages = result.hits.hits.map(function(hit) {
+      var package = hit._source;
+      package.package = package.name;
+      package.url = '/' + package.username + '/' + package.name;
+      return package;
     });
     next();
   }, function (err) {
@@ -387,11 +384,11 @@ app.get('/:username', lookupPathUser, function(req, res, next) {
   data.content.username = req.params.username;
 
   request('http://' + PUBLIC_PACKAGE_REPOSITORY_HOST + '/v1/' + encodeURIComponent(req.pathUser.username) + '/_packages')
-    .then(function(projects) {
-      projects = JSON.parse(projects);
-      data.content.projects = projects.map(function(project) {
-        project.url = '/' + project.username + '/' + project.package;
-        return project;
+    .then(function(packages) {
+      packages = JSON.parse(packages);
+      data.content.packages = packages.map(function(package) {
+        package.url = '/' + package.username + '/' + package.package;
+        return package;
       });
       next();
     })
