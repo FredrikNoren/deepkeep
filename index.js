@@ -12,6 +12,7 @@ var pg = require('pg');
 var passport = require('passport');
 var Auth0Strategy = require('passport-auth0');
 var elasticsearch = require('elasticsearch');
+var morgan = require('morgan');
 var Auth0 = require('auth0');
 var React = require('react');
 require('node-jsx').install({extension: '.jsx', harmony: true });
@@ -108,10 +109,7 @@ var esClient = new elasticsearch.Client({
   host: ELASTICSEARCH_HOST
 });
 
-app.use(function requestLogger(req, res, next) {
-  console.log(req.method + ' ' + req.url);
-  next();
-});
+app.use(morgan('combined'));
 
 app.use('/static', compression(), express.static('static'));
 
