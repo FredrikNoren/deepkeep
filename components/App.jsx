@@ -43,7 +43,7 @@ class App extends React.Component {
             <div className={`${P}-search`}>
               <i className="fa fa-search"></i>
               <form action='/search' method='GET'>
-                <input type="text" placeholder="Search" name="q"/>
+                <input type="text" placeholder="Search" name="q" autoComplete="off"/>
               </form>
             </div>
             <div className={`${P}-profile`}>
