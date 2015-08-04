@@ -66,8 +66,8 @@ class Project extends React.Component {
           <div className={`${P}-sidebar-item`}>
             <b>Validated by</b>
               {this.props.validations.map(validation => {
-                return <ValidatedBadge name={validation.verificationname}
-                  link={'/' + validation.verificationname}
+                return <ValidatedBadge name={validation.validationname}
+                  link={'/' + validation.validationname}
                   score={validation.status} />
               })}
           </div>
