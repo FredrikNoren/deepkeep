@@ -5,21 +5,14 @@ Let's package and upload a network that we've trained. We'll use
 the network at the end of the training by adding this to your lua training script:
 
 ```lua
-torch.save('network.t7', net) -- net is a nn.gModule here
+torch.save('deepkeep.xor.t7', net) -- net is a nn.gModule here
 ```
 
 Once you've run the training, you will end up with a file called `network.t7`.
-This is the trained network that we will package and upload to deepkeep.
-Create a file called `package.json` by running the deepkeep init helper.
-
-```json
-deepkeep init
-```
-
-And finally publish the network:
+This is the trained network that we will package and upload to deepkeep:
 
 ```bash
-deepkeep publish
+deepkeep push deepkeep.xor.t7
 ```
 
 And you're all done! See our
