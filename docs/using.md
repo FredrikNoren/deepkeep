@@ -6,13 +6,14 @@ example. Start by downloading and extracting the network:
 deepkeep pull deepkeep/xor
 ```
 
-Then create a file called `test.lua` and add the following to it:
+This creates a file called `xor.t7`. Next create a file called `test.lua` and add
+the following to it:
 
 ```lua
 require 'torch'
 require 'nngraph'
 
-local net = torch.load('deepkeep/xor/network.t7')
+local net = torch.load('xor.t7')
 
 print('0 XOR 0 = ' .. net:forward(torch.Tensor({ 0, 0 }))[1])
 print('0 XOR 1 = ' .. net:forward(torch.Tensor({ 0, 1 }))[1])
